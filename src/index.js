@@ -209,6 +209,7 @@ function refreshKeyOf(profile, config) {
     defaultContextWindow: profile.defaultContextWindow,
     defaultMaxTokens: profile.defaultMaxTokens,
     defaultInput: profile.defaultInput,
+    sync: profileSyncValue(profile),
     headers: sortedHeaders(catalogHeadersOf(profile.headers, config.headers)),
   })
 }

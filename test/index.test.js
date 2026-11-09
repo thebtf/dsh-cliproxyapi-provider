@@ -202,6 +202,24 @@ test('settings changes synchronize outside the originating transaction', async (
   }
 })
 
+test('a new bootstrap token triggers synchronization for an unchanged profile', async () => {
+  const previousFetch = globalThis.fetch
+  globalThis.fetch = async () => new Response(JSON.stringify({ models: [{ slug: 'model' }] }), { status: 200 })
+  const harness = createContext({ providers: { CLIProxyAPI: managedProfile() } })
+  try {
+    apply(harness.ctx, await resolvedConfig())
+    await waitFor(() => harness.mutations.length === 1)
+    const profile = harness.section.providers.CLIProxyAPI
+    harness.setSection({ providers: { CLIProxyAPI: { ...profile, headers: { ...profile.headers, [PROFILE_SYNC_HEADER]: 'rich:again' } } } })
+    harness.emit('settings/document-updated', 'llm-pi-ai')
+    await waitFor(() => harness.mutations.length === 2)
+    assert.equal(harness.section.providers.CLIProxyAPI.headers[PROFILE_SYNC_HEADER], undefined)
+  } finally {
+    harness.dispose()
+    globalThis.fetch = previousFetch
+  }
+})
+
 test('first profile synchronization restores capabilities stripped by the browser RPC', async () => {
   const previousFetch = globalThis.fetch
   let fetches = 0
