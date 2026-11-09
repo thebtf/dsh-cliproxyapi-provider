@@ -172,6 +172,7 @@ test('initial discovery requests the fixed rich catalog and returns full capabil
       contextWindow: 372000,
       maxTokens: 32768,
       input: ['text', 'image'],
+      inputModalities: ['text', 'image'],
       reasoningEfforts: { low: 'low', high: 'high' },
     })
     harness.dispose()
@@ -581,6 +582,7 @@ test('real Cordis composition leaves llm-pi-ai as the sole directory owner', asy
       signal: new AbortController().signal,
     })
     assert.equal(discovered[0].input, undefined)
+    assert.deepEqual(discovered[1].inputModalities, ['text', 'image'])
     assert.equal(discovered[1].reasoningEfforts, undefined)
     await ctx.settings.mutate('llm-pi-ai', [{
       op: 'set',

@@ -302,7 +302,7 @@ export function apply(ctx, config) {
       fetchTimeoutMs: activeConfig.fetchTimeoutMs,
     }, request.apiKey, signal ?? request.signal)
     rememberDiscovery(request.baseURL, catalog.models)
-    return catalog.models
+    return catalog.models.map((model) => ({ ...model, inputModalities: [...model.input] }))
   })
 
   let observedRefreshKey
