@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { Context, Service } from '@deepseek-ai/cordis'
 import { CredentialProvider } from '@deepseek-ai/dsh-credentials'
 import { createUserMessage, LlmRuntime } from '@deepseek-ai/dsh-llm'
@@ -9,7 +10,6 @@ import {
   inject as piAiInject,
   name as piAiName,
 } from '@deepseek-ai/dsh-llm-pi-ai'
-import { SettingsProvider } from '@deepseek-ai/dsh-settings'
 import {
   Config,
   PLACEHOLDER_AUTHORIZATION,
@@ -58,8 +58,8 @@ function createContext(initialSection, initialCredential) {
       },
     },
     settings: {
-      get() {
-        return section
+      describe() {
+        return [{ ns: 'llm-pi-ai', value: section }]
       },
       async mutate(_ns, ops) {
         mutations.push(ops)
@@ -88,6 +88,9 @@ function createContext(initialSection, initialCredential) {
       const dispose = () => cleanup?.()
       effects.push(dispose)
       return dispose
+    },
+    inject(_services, callback) {
+      return callback(ctx)
     },
     timeout(callback, delay) {
       const row = { callback, delay, cancelled: false }
@@ -141,13 +144,15 @@ test('initial discovery requests the fixed rich catalog and returns full capabil
   let requestURL
   globalThis.fetch = async (url) => {
     requestURL = String(url)
-    return new Response(JSON.stringify({ models: [{
-      slug: 'gpt-5.6-sol',
-      display_name: 'GPT 5.6 Sol',
-      max_context_window: 372000,
-      input_modalities: ['text', 'image'],
-      supported_reasoning_levels: [{ effort: 'low' }, { effort: 'high' }],
-    }] }), { status: 200 })
+    return new Response(JSON.stringify({
+      models: [{
+        slug: 'gpt-5.6-sol',
+        display_name: 'GPT 5.6 Sol',
+        max_context_window: 372000,
+        input_modalities: ['text', 'image'],
+        supported_reasoning_levels: [{ effort: 'low' }, { effort: 'high' }],
+      }]
+    }), { status: 200 })
   }
   try {
     const harness = createContext({ providers: {} })
@@ -156,8 +161,7 @@ test('initial discovery requests the fixed rich catalog and returns full capabil
       provider: 'CLIProxyAPI',
       baseURL: 'http://127.0.0.1:8317/v1',
       apiKey: 'secret-key',
-      signal: new AbortController().signal,
-    })
+    }, new AbortController().signal)
     assert.equal(
       requestURL,
       'http://127.0.0.1:8317/v1/models?client_version=dsh-cliproxyapi-provider',
@@ -168,10 +172,51 @@ test('initial discovery requests the fixed rich catalog and returns full capabil
       contextWindow: 372000,
       maxTokens: 32768,
       input: ['text', 'image'],
+      inputModalities: ['text', 'image'],
       reasoningEfforts: { low: 'low', high: 'high' },
     })
     harness.dispose()
   } finally {
+    globalThis.fetch = previousFetch
+  }
+})
+
+test('settings changes synchronize outside the originating transaction', async () => {
+  const transaction = new AsyncLocalStorage()
+  const previousFetch = globalThis.fetch
+  globalThis.fetch = async () => new Response(JSON.stringify({ models: [{ slug: 'model' }] }), { status: 200 })
+  const harness = createContext({ providers: {} })
+  const mutate = harness.ctx.settings.mutate
+  harness.ctx.settings.mutate = async (...args) => {
+    if (transaction.getStore()) throw new Error('HMR transactions cannot be nested')
+    return mutate(...args)
+  }
+  try {
+    apply(harness.ctx, await resolvedConfig())
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    harness.setSection({ providers: { CLIProxyAPI: managedProfile() } })
+    transaction.run(true, () => harness.emit('settings/document-updated', 'llm-pi-ai'))
+    await waitFor(() => harness.mutations.length === 1)
+  } finally {
+    harness.dispose()
+    globalThis.fetch = previousFetch
+  }
+})
+
+test('a new bootstrap token triggers synchronization for an unchanged profile', async () => {
+  const previousFetch = globalThis.fetch
+  globalThis.fetch = async () => new Response(JSON.stringify({ models: [{ slug: 'model' }] }), { status: 200 })
+  const harness = createContext({ providers: { CLIProxyAPI: managedProfile() } })
+  try {
+    apply(harness.ctx, await resolvedConfig())
+    await waitFor(() => harness.mutations.length === 1)
+    const profile = harness.section.providers.CLIProxyAPI
+    harness.setSection({ providers: { CLIProxyAPI: { ...profile, headers: { ...profile.headers, [PROFILE_SYNC_HEADER]: 'rich:again' } } } })
+    harness.emit('settings/document-updated', 'llm-pi-ai')
+    await waitFor(() => harness.mutations.length === 2)
+    assert.equal(harness.section.providers.CLIProxyAPI.headers[PROFILE_SYNC_HEADER], undefined)
+  } finally {
+    harness.dispose()
     globalThis.fetch = previousFetch
   }
 })
@@ -181,23 +226,25 @@ test('first profile synchronization restores capabilities stripped by the browse
   let fetches = 0
   globalThis.fetch = async () => {
     fetches += 1
-    return new Response(JSON.stringify({ models: [
-      {
-        slug: 'gpt-5.6-sol',
-        display_name: 'GPT 5.6 Sol',
-        max_context_window: 372000,
-        input_modalities: ['text', 'image'],
-        supported_reasoning_levels: [
-          { effort: 'low' }, { effort: 'medium' }, { effort: 'high' },
-          { effort: 'xhigh' }, { effort: 'max' },
-        ],
-      },
-      {
-        slug: 'gpt-5.6-spark',
-        display_name: 'GPT 5.6 Spark',
-        input_modalities: ['text'],
-      },
-    ] }), { status: 200 })
+    return new Response(JSON.stringify({
+      models: [
+        {
+          slug: 'gpt-5.6-sol',
+          display_name: 'GPT 5.6 Sol',
+          max_context_window: 372000,
+          input_modalities: ['text', 'image'],
+          supported_reasoning_levels: [
+            { effort: 'low' }, { effort: 'medium' }, { effort: 'high' },
+            { effort: 'xhigh' }, { effort: 'max' },
+          ],
+        },
+        {
+          slug: 'gpt-5.6-spark',
+          display_name: 'GPT 5.6 Spark',
+          input_modalities: ['text'],
+        },
+      ]
+    }), { status: 200 })
   }
   try {
     const harness = createContext({ providers: {} })
@@ -206,21 +253,23 @@ test('first profile synchronization restores capabilities stripped by the browse
     const discovered = await harness.discoveries.get('llm-cliproxyapi')({
       provider: 'CLIProxyAPI',
       baseURL: 'http://127.0.0.1:8317/v1',
-      signal: new AbortController().signal,
-    })
-    const bootstrapModels = discovered.map(({ id, name, contextWindow, maxTokens }) => ({
+    }, new AbortController().signal)
+    const bootstrapModels = discovered.map(({ id, name, contextWindow, maxTokens, inputModalities }) => ({
       id, name, contextWindow, maxTokens,
+      ...(inputModalities ? { input: [...inputModalities] } : {}),
     }))
-    harness.setSection({ providers: {
-      CLIProxyAPI: managedProfile({
-        models: bootstrapModels,
-        headers: {
-          [PROFILE_SYNC_HEADER]: 'rich:test',
-          authorization: PLACEHOLDER_AUTHORIZATION,
-        },
-      }),
-    } })
-    harness.emit('settings/updated', 'llm-pi-ai', harness.section, undefined, 'update')
+    harness.setSection({
+      providers: {
+        CLIProxyAPI: managedProfile({
+          models: bootstrapModels,
+          headers: {
+            [PROFILE_SYNC_HEADER]: 'rich:test',
+            authorization: PLACEHOLDER_AUTHORIZATION,
+          },
+        }),
+      }
+    })
+    harness.emit('settings/document-updated', 'llm-pi-ai', harness.section, undefined, 'update')
 
     await waitFor(() => harness.mutations.length === 1)
     const profile = harness.mutations[0][0].value
@@ -235,7 +284,7 @@ test('first profile synchronization restores capabilities stripped by the browse
       reasoningEfforts: {
         low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max',
       },
-      compat: { chatTemplateKwargs: {} },
+      compat: { chatTemplateKwargs: {}, chatTemplateArgs: {} },
     })
     assert.deepEqual(profile.models[1].input, ['text'])
     await waitFor(() => harness.timeouts.some((row) => row.delay === 300000))
@@ -251,27 +300,31 @@ test('first profile synchronization restores capabilities stripped by the browse
 
 test('credential refresh cannot finalize a pending bootstrap profile early', async () => {
   const previousFetch = globalThis.fetch
-  globalThis.fetch = async () => new Response(JSON.stringify({ models: [{
-    slug: 'vision-model',
-    input_modalities: ['text', 'image'],
-    supported_reasoning_levels: [{ effort: 'high' }],
-  }] }), { status: 200 })
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    models: [{
+      slug: 'vision-model',
+      input_modalities: ['text', 'image'],
+      supported_reasoning_levels: [{ effort: 'high' }],
+    }]
+  }), { status: 200 })
   try {
     const harness = createContext({ providers: {} })
     apply(harness.ctx, await resolvedConfig())
     await new Promise((resolve) => setTimeout(resolve, 0))
-    harness.setSection({ providers: {
-      CLIProxyAPI: managedProfile({
-        models: [{
-          id: 'vision-model', name: 'Vision Model', contextWindow: 262144, maxTokens: 32768,
-          input: ['text', 'image'], reasoningEfforts: { high: 'high' },
-        }],
-        headers: {
-          [PROFILE_SYNC_HEADER]: 'rich:test',
-          authorization: PLACEHOLDER_AUTHORIZATION,
-        },
-      }),
-    } })
+    harness.setSection({
+      providers: {
+        CLIProxyAPI: managedProfile({
+          models: [{
+            id: 'vision-model', name: 'Vision Model', contextWindow: 262144, maxTokens: 32768,
+            input: ['text', 'image'], reasoningEfforts: { high: 'high' },
+          }],
+          headers: {
+            [PROFILE_SYNC_HEADER]: 'rich:test',
+            authorization: PLACEHOLDER_AUTHORIZATION,
+          },
+        }),
+      }
+    })
     harness.setCredential('secret-key')
     harness.emit('credentials/reference-updated', 'DSH_CLIPROXY_API_KEY')
 
@@ -297,16 +350,18 @@ test('keyless profiles omit apiKeyEnv and receive a non-sensitive placeholder he
     return new Response(JSON.stringify({ models: [{ slug: 'model-a' }] }), { status: 200 })
   }
   try {
-    const harness = createContext({ providers: {
-      CLIProxyAPI: managedProfile(),
-    } })
+    const harness = createContext({
+      providers: {
+        CLIProxyAPI: managedProfile(),
+      }
+    })
     apply(harness.ctx, await resolvedConfig())
     await waitFor(() => harness.mutations.length === 1)
     const profile = harness.mutations[0][0].value
     assert.equal(profile.apiKeyEnv, undefined)
     assert.equal(profile.headers.authorization, PLACEHOLDER_AUTHORIZATION)
     assert.equal(profile.models[0].id, 'model-a')
-    harness.emit('settings/updated', 'llm-pi-ai', harness.section, undefined, 'update')
+    harness.emit('settings/document-updated', 'llm-pi-ai', harness.section, undefined, 'update')
     await new Promise((resolve) => setTimeout(resolve, 25))
     assert.equal(harness.mutations.length, 1)
     assert.equal(fetches, 1)
@@ -324,9 +379,11 @@ test('refreshIntervalMs zero disables healthy periodic refreshes', async () => {
     return new Response(JSON.stringify({ models: [{ slug: 'model-a' }] }), { status: 200 })
   }
   try {
-    const harness = createContext({ providers: {
-      CLIProxyAPI: managedProfile(),
-    } })
+    const harness = createContext({
+      providers: {
+        CLIProxyAPI: managedProfile(),
+      }
+    })
     apply(harness.ctx, await resolvedConfig({ refreshIntervalMs: 0 }))
     await waitFor(() => fetches === 1)
     await new Promise((resolve) => setTimeout(resolve, 25))
@@ -341,14 +398,16 @@ test('credential removal regenerates the profile in keyless mode', async () => {
   const previousFetch = globalThis.fetch
   globalThis.fetch = async () => new Response(JSON.stringify({ models: [{ slug: 'model-a' }] }), { status: 200 })
   try {
-    const harness = createContext({ providers: {
-      CLIProxyAPI: managedProfile({
-        apiKeyEnv: 'DSH_CLIPROXY_API_KEY',
-        headers: {
-          authorization: PLACEHOLDER_AUTHORIZATION,
-        },
-      }),
-    } }, 'secret-key')
+    const harness = createContext({
+      providers: {
+        CLIProxyAPI: managedProfile({
+          apiKeyEnv: 'DSH_CLIPROXY_API_KEY',
+          headers: {
+            authorization: PLACEHOLDER_AUTHORIZATION,
+          },
+        }),
+      }
+    }, 'secret-key')
     apply(harness.ctx, await resolvedConfig())
     await waitFor(() => harness.mutations.length === 1)
     assert.equal(harness.mutations[0][0].value.apiKeyEnv, 'DSH_CLIPROXY_API_KEY')
@@ -381,15 +440,19 @@ test('a newer settings change aborts stale discovery and only installs the lates
     return new Response(JSON.stringify({ models: [{ slug: 'model-b' }] }), { status: 200 })
   }
   try {
-    const harness = createContext({ providers: {
-      CLIProxyAPI: managedProfile(),
-    } })
+    const harness = createContext({
+      providers: {
+        CLIProxyAPI: managedProfile(),
+      }
+    })
     apply(harness.ctx, await resolvedConfig())
     await firstStarted
-    harness.setSection({ providers: {
-      CLIProxyAPI: managedProfile({ baseURL: 'http://127.0.0.1:9417/v1' }),
-    } })
-    harness.emit('settings/updated', 'llm-pi-ai', harness.section, undefined, 'update')
+    harness.setSection({
+      providers: {
+        CLIProxyAPI: managedProfile({ baseURL: 'http://127.0.0.1:9417/v1' }),
+      }
+    })
+    harness.emit('settings/document-updated', 'llm-pi-ai', harness.section, undefined, 'update')
     await waitFor(() => harness.mutations.length === 1)
     const profile = harness.mutations[0][0].value
     assert.equal(profile.baseURL, 'http://127.0.0.1:9417/v1')
@@ -406,9 +469,11 @@ test('catalog requests honor timeout and failed refreshes use exponential backof
     options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true })
   })
   try {
-    const harness = createContext({ providers: {
-      CLIProxyAPI: managedProfile(),
-    } })
+    const harness = createContext({
+      providers: {
+        CLIProxyAPI: managedProfile(),
+      }
+    })
     apply(harness.ctx, await resolvedConfig({ fetchTimeoutMs: 10, retryInitialMs: 20, retryMaxMs: 80 }))
     await waitFor(() => harness.timeouts.length === 1)
     assert.equal(harness.timeouts[0].delay, 20)
@@ -433,17 +498,26 @@ test('real Cordis composition leaves llm-pi-ai as the sole directory owner', asy
     },
   }
 
-  class MemorySettings extends SettingsProvider {
-    writable = true
-    async load() { return structuredClone(document) }
-    async persist(ns, section) { document[ns] = structuredClone(section) }
+  class MemorySettings extends Service {
+    constructor(ctx) { super(ctx, 'settings') }
+    configure() { return () => { } }
+    describe() { return [{ ns: 'llm-pi-ai', value: structuredClone(document['llm-pi-ai']) }] }
+    async mutate(ns, ops) {
+      assert.equal(ns, 'llm-pi-ai')
+      for (const op of ops) {
+        assert.equal(op.op, 'set')
+        assert.deepEqual(op.path, ['providers', 'CLIProxyAPI'])
+        document[ns].providers.CLIProxyAPI = structuredClone(op.value)
+      }
+      this.ctx.emit('settings/document-updated', ns, 1)
+    }
   }
 
   class MemoryCredentials extends CredentialProvider {
     async resolve() { return undefined }
     async describe() { return { configured: false, writable: true } }
-    async set() {}
-    async unset() {}
+    async set() { }
+    async unset() { }
   }
 
   class TimerService extends Service {
@@ -464,10 +538,12 @@ test('real Cordis composition leaves llm-pi-ai as the sole directory owner', asy
     const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
     if (method === 'GET' && url.includes('/models?')) {
       catalogFetches += 1
-      return new Response(JSON.stringify({ models: [
-        { slug: 'plain', supported_reasoning_levels: [{ effort: 'none' }] },
-        { slug: 'think', supported_reasoning_levels: [{ effort: 'none' }, { effort: 'high' }] },
-      ] }), { status: 200 })
+      return new Response(JSON.stringify({
+        models: [
+          { slug: 'plain', supported_reasoning_levels: [{ effort: 'none' }] },
+          { slug: 'think', input_modalities: ['text', 'image'], supported_reasoning_levels: [{ effort: 'none' }, { effort: 'high' }] },
+        ]
+      }), { status: 200 })
     }
     const headers = new Headers(input instanceof Request ? input.headers : undefined)
     for (const [key, value] of new Headers(init?.headers)) headers.set(key, value)
@@ -506,6 +582,7 @@ test('real Cordis composition leaves llm-pi-ai as the sole directory owner', asy
       signal: new AbortController().signal,
     })
     assert.equal(discovered[0].input, undefined)
+    assert.deepEqual(discovered[1].inputModalities, ['text', 'image'])
     assert.equal(discovered[1].reasoningEfforts, undefined)
     await ctx.settings.mutate('llm-pi-ai', [{
       op: 'set',
@@ -519,16 +596,20 @@ test('real Cordis composition leaves llm-pi-ai as the sole directory owner', asy
       }),
     }])
 
-    await waitFor(() => ctx.settings.get('llm-pi-ai')?.providers?.CLIProxyAPI?.models?.[0]?.id === 'plain')
-    await waitFor(() => ctx.settings.get('llm-pi-ai').providers.CLIProxyAPI.headers[PROFILE_SYNC_HEADER] === undefined)
+    await waitFor(() => ctx.settings.describe()[0].value?.providers?.CLIProxyAPI?.models?.[0]?.id === 'plain')
+    await waitFor(() => ctx.settings.describe()[0].value.providers.CLIProxyAPI.headers[PROFILE_SYNC_HEADER] === undefined)
     assert.equal(catalogFetches, 1)
+    piFiber.update({ providers: ctx.settings.describe()[0].value.providers })
+    await piFiber.await()
     const directories = ctx.llm.listConfigurableProviders().filter((entry) => entry.provider === 'CLIProxyAPI')
     assert.equal(directories.length, 1)
     assert.equal(directories[0].settingsNs, 'llm-pi-ai')
     assert.equal(ctx.llm.listProviders().some((provider) => provider.id === 'CLIProxyAPI'), true)
-    const models = ctx.settings.get('llm-pi-ai').providers.CLIProxyAPI.models
+    const models = ctx.settings.describe()[0].value.providers.CLIProxyAPI.models
     assert.equal(models[0].reasoningEfforts, undefined)
     assert.deepEqual(models[1].reasoningEfforts, { off: 'none', high: 'high' })
+    assert.deepEqual(models[1].input, ['text', 'image'])
+    assert.deepEqual((await ctx.llm.resolveModelInfo('CLIProxyAPI', 'think')).inputModalities, ['text', 'image'])
 
     const chunks = []
     for await (const chunk of ctx.llm.stream({
@@ -544,6 +625,6 @@ test('real Cordis composition leaves llm-pi-ai as the sole directory owner', asy
     assert.notEqual(chunks.at(-1)?.reason?.failure?.code, 'MISSING_CREDENTIAL')
   } finally {
     globalThis.fetch = previousFetch
-    for (const fiber of fibers.reverse()) await fiber.dispose().catch(() => {})
+    for (const fiber of fibers.reverse()) await fiber.dispose().catch(() => { })
   }
 })
