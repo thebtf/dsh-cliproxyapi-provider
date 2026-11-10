@@ -11,7 +11,7 @@ The plugin automatically retrieves the model list from CLIProxyAPI, so models do
 Install the plugin:
 
 ```powershell
-npx @deepseek-ai/dsh plugin --profile web add 'github:thebtf/dsh-cliproxyapi-provider#v0.2.0'
+npx @deepseek-ai/dsh plugin --profile web add 'github:thebtf/dsh-cliproxyapi-provider#v0.2.1'
 ```
 
 Start or restart DeepSeek Harness Web:
