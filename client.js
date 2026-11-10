@@ -47,6 +47,16 @@ window.__ModuleLoader__.load({
         baseRequired: 'Base URL is required.',
         baseInvalid: 'Base URL must be a valid HTTP or HTTPS URL.',
         noModels: 'CLIProxyAPI returned no usable models.',
+        models: 'Available models',
+        loadModels: 'Load models',
+        loadingModels: 'Loading models…',
+        modelsHelp: 'Disabled models are removed from DSH and requests from existing DSH sessions may fail. Direct CPA API calls are not blocked. New models are enabled by default.',
+        loadFailed: 'Could not load the model catalog. Check the URL and API key and try again.',
+        metadataHelp: 'Context, output limits and input types are effective settings; values may use configured defaults when the server does not provide them.',
+        noEnabledRefresh: 'No current catalog models are enabled. The previous provider list remains active until you enable a model and save.',
+        needOneModel: 'Enable at least one available model. DSH cannot save an empty provider catalog.',
+        selectionUnavailable: 'Model selection settings are unavailable or read-only.',
+        partialSave: 'Saving did not finish. The model selection, API key or profile may already have changed; reload settings and retry.',
       },
       zh: {
         tab: 'CLIProxyAPI',
@@ -69,6 +79,16 @@ window.__ModuleLoader__.load({
         baseRequired: '请填写 Base URL。',
         baseInvalid: 'Base URL 必须是有效的 HTTP 或 HTTPS 地址。',
         noModels: 'CLIProxyAPI 未返回可用模型。',
+        models: '可用模型',
+        loadModels: '加载模型',
+        loadingModels: '正在加载模型…',
+        modelsHelp: '禁用的模型会从 DSH 中移除，已有 DSH 会话的请求也可能失败。直接调用 CPA API 不受影响。新模型默认启用。',
+        loadFailed: '无法加载模型目录。请检查 URL 和 API Key 后重试。',
+        metadataHelp: '上下文、输出上限和输入类型为实际配置；服务未提供时可能使用默认值。',
+        noEnabledRefresh: '当前目录没有已启用的模型。启用模型并保存前，原供应商列表仍然生效。',
+        needOneModel: '请至少启用一个可用模型。DSH 不支持保存空的供应商模型目录。',
+        selectionUnavailable: '模型选择设置不可用或为只读。',
+        partialSave: '保存未完成。模型选择、API Key 或配置可能已经更改；请重新加载设置后重试。',
       },
     }
 
@@ -88,6 +108,8 @@ window.__ModuleLoader__.load({
       actions: { display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '4px' },
       button: { cursor: 'pointer', minHeight: '38px', border: '1px solid transparent', borderRadius: '10px', background: 'var(--dsw-alias-brand-primary)', color: 'var(--dsw-alias-label-inverse, #fff)', padding: '8px 14px', font: 'inherit', fontWeight: 600 },
       buttonDisabled: { cursor: 'default', opacity: 0.75 },
+      modelList: { display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '360px', overflowY: 'auto' },
+      model: { display: 'flex', alignItems: 'flex-start', gap: '8px' },
     }
 
     function validBaseURL(value, messages) {
@@ -106,8 +128,16 @@ window.__ModuleLoader__.load({
         || String(Date.now()) + '-' + Math.random().toString(36).slice(2)
     }
 
-    function bootstrapProfileOf(baseURL, models, hasCredential, syncToken) {
+    function bootstrapProfileOf(baseURL, models, hasCredential, syncToken, previous = {}) {
+      const headers = { ...previous.headers }
+      for (const key of Object.keys(headers)) {
+        if (key.toLowerCase() === PROFILE_SYNC_HEADER || (key.toLowerCase() === 'authorization' && headers[key] === PLACEHOLDER_AUTHORIZATION)) delete headers[key]
+      }
+      headers[PROFILE_SYNC_HEADER] = 'rich:' + syncToken
+      if (!hasCredential && !Object.keys(headers).some((key) => key.toLowerCase() === 'authorization')) headers.authorization = PLACEHOLDER_AUTHORIZATION
+      const { apiKeyEnv: _previousApiKeyEnv, modelOverrides: _previousModelOverrides, ...rest } = previous
       return {
+        ...rest,
         displayName: PROVIDER,
         api: 'openai-responses',
         baseURL,
@@ -120,15 +150,34 @@ window.__ModuleLoader__.load({
             ? [...model.inputModalities]
             : ['text'],
         })),
-        defaultContextWindow: 262144,
-        defaultMaxTokens: 32768,
-        defaultInput: ['text'],
-        headers: {
-          [PROFILE_SYNC_HEADER]: 'rich:' + syncToken,
-          ...(hasCredential ? {} : { authorization: PLACEHOLDER_AUTHORIZATION }),
-        },
+        defaultContextWindow: previous.defaultContextWindow ?? 262144,
+        defaultMaxTokens: previous.defaultMaxTokens ?? 32768,
+        defaultInput: previous.defaultInput ?? ['text'],
+        headers,
         ...(hasCredential ? { apiKeyEnv: CREDENTIAL_REF } : {}),
       }
+    }
+
+    function comparableProfile(profile, credentialChanged) {
+      if (!profile) return profile
+      const { models: _models, ...rest } = profile
+      const headers = { ...rest.headers }
+      for (const key of Object.keys(headers)) {
+        if (key.toLowerCase() === PROFILE_SYNC_HEADER || (credentialChanged && key.toLowerCase() === 'authorization' && headers[key] === PLACEHOLDER_AUTHORIZATION)) delete headers[key]
+      }
+      if (credentialChanged) delete rest.apiKeyEnv
+      return { ...rest, headers }
+    }
+
+    function stableJson(value) {
+      if (Array.isArray(value)) return value.map(stableJson)
+      if (!value || typeof value !== 'object') return value
+      return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableJson(value[key])]))
+    }
+
+    function sameProfile(left, right, credentialChanged) {
+      if (credentialChanged && left?.apiKeyEnv !== right?.apiKeyEnv && left?.apiKeyEnv !== CREDENTIAL_REF) return false
+      return JSON.stringify(stableJson(comparableProfile(left, credentialChanged))) === JSON.stringify(stableJson(comparableProfile(right, credentialChanged)))
     }
 
     function syncValueOf(headers) {
@@ -136,7 +185,7 @@ window.__ModuleLoader__.load({
       return key === undefined ? undefined : String(headers[key])
     }
 
-    function waitForProfileSynchronization(scope, baseURL, previousRevision, messages) {
+    function waitForProfileSynchronization(scope, baseURL, previousRevision, enabled, hasCredential, messages) {
       return new Promise((resolve, reject) => {
         let finished = false
         let dispose = () => { }
@@ -154,7 +203,11 @@ window.__ModuleLoader__.load({
           if (snapshot?.status !== 'ready') return
           if (Number.isInteger(previousRevision) && (!Number.isInteger(snapshot.revision) || snapshot.revision <= previousRevision)) return
           const profile = snapshot.value?.providers?.[PROVIDER]
-          if (profile?.baseURL === baseURL && syncValueOf(profile.headers) === undefined) finish()
+          const actualIds = profile?.models?.map((model) => model.id).sort()
+          const expectedIds = enabled.map((model) => model.id).sort()
+          if (profile?.baseURL === baseURL && syncValueOf(profile.headers) === undefined &&
+            JSON.stringify(actualIds) === JSON.stringify(expectedIds) &&
+            (hasCredential ? profile.apiKeyEnv === CREDENTIAL_REF : profile.apiKeyEnv === undefined)) finish()
         }
         dispose = scope.subscribe(inspect)
         timeout = setTimeout(() => finish(new Error(messages.syncTimeout)), PROFILE_SYNC_TIMEOUT_MS)
@@ -172,48 +225,97 @@ window.__ModuleLoader__.load({
       }
     }
 
-    async function installInitialProfile(remote, scope, baseURL, apiKey, messages) {
-      const discovery = await remote.llm.discoverModels(DISCOVERY_NS, {
-        provider: PROVIDER,
-        baseURL,
-        api: 'openai-responses',
-        ...(apiKey ? { apiKey } : {}),
-      })
-      if (!discovery.ok) throw new Error(discovery.error.message)
-      if (!discovery.value.length) throw new Error(messages.noModels)
-
-      const credential = await remote.credentials.describe([CREDENTIAL_REF])
-      const configured = credential.ok && credential.value[CREDENTIAL_REF]?.configured === true
-      if (apiKey) {
-        const saved = await remote.credentials.set(CREDENTIAL_REF, apiKey)
-        if (!saved.ok) throw new Error(saved.error.message)
+    async function discoverModels(remote, baseURL, apiKey, messages) {
+      let discovery
+      try {
+        discovery = await remote.llm.discoverModels(DISCOVERY_NS, {
+          provider: PROVIDER,
+          baseURL,
+          api: 'openai-responses',
+          ...(apiKey ? { apiKey } : {}),
+        })
+      } catch {
+        throw new Error(messages.loadFailed)
       }
-      const previousRevision = scope.getSnapshot().revision
-      const saved = await scope.mutate([{
-        op: 'set',
-        path: ['providers', PROVIDER],
-        value: bootstrapProfileOf(baseURL, discovery.value, Boolean(apiKey || configured), createSyncToken()),
-      }])
-      if (!saved) throw new Error(messages.saveFailed)
-      await waitForProfileSynchronization(scope, baseURL, previousRevision, messages)
+      if (!discovery.ok) throw new Error(messages.loadFailed)
+      if (!discovery.value.length) throw new Error(messages.noModels)
+      return discovery.value
     }
 
-    function SettingsTab({ scope, remote, t, view, useScope }) {
+    async function installInitialProfile(remote, scope, selectionScope, baseURL, apiKey, draft, messages) {
+      const initialSnapshot = scope.getSnapshot()
+      if (initialSnapshot?.status !== 'ready' || !initialSnapshot.writable || !Number.isInteger(initialSnapshot.revision)) throw new Error(messages.saveFailed)
+      const originalProfile = initialSnapshot.value?.providers?.[PROVIDER]
+      const models = await discoverModels(remote, baseURL, apiKey, messages)
+      const selectionSnapshot = selectionScope.getSnapshot()
+      if (selectionSnapshot?.status !== 'ready' || !selectionSnapshot.writable) throw new Error(messages.selectionUnavailable)
+      const selection = { ...(selectionSnapshot.value?.modelSelection || {}), ...draft }
+      const enabled = models.filter((model) => selection[model.id] !== false)
+      if (!enabled.length) throw new Error(messages.needOneModel)
+
+      const credential = await remote.credentials.describe([CREDENTIAL_REF])
+      if (!credential.ok) throw new Error(messages.saveFailed)
+      const configured = credential.ok && credential.value[CREDENTIAL_REF]?.configured === true
+      let writesStarted = false
+      try {
+        if (Object.keys(draft).length) {
+          writesStarted = true
+          const selected = await selectionScope.mutate([{ op: 'set', path: ['modelSelection'], value: selection }], selectionSnapshot.revision)
+          if (!selected) throw new Error(messages.partialSave)
+        }
+        if (apiKey) {
+          writesStarted = true
+          const saved = await remote.credentials.set(CREDENTIAL_REF, apiKey)
+          if (!saved.ok) throw new Error(messages.partialSave)
+        }
+        let profileSnapshot = scope.getSnapshot()
+        if (profileSnapshot?.status !== 'ready' || !profileSnapshot.writable || !Number.isInteger(profileSnapshot.revision)) throw new Error(messages.partialSave)
+        if (!sameProfile(profileSnapshot.value?.providers?.[PROVIDER], originalProfile, Boolean(apiKey))) throw new Error(messages.partialSave)
+        let previousRevision
+        let saved = false
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          previousRevision = profileSnapshot.revision
+          writesStarted = true
+          saved = await scope.mutate([{
+            op: 'set',
+            path: ['providers', PROVIDER],
+            value: bootstrapProfileOf(baseURL, enabled, Boolean(apiKey || configured), createSyncToken(), profileSnapshot.value?.providers?.[PROVIDER]),
+          }], previousRevision)
+          if (saved) break
+          const refreshed = scope.getSnapshot()
+          if (refreshed?.status !== 'ready' || !refreshed.writable || !Number.isInteger(refreshed.revision) || refreshed.revision <= previousRevision ||
+            !sameProfile(refreshed.value?.providers?.[PROVIDER], originalProfile, Boolean(apiKey))) break
+          profileSnapshot = refreshed
+        }
+        if (!saved) throw new Error(messages.partialSave)
+        await waitForProfileSynchronization(scope, baseURL, previousRevision, enabled, Boolean(apiKey || configured), messages)
+      } catch (error) {
+        if (writesStarted) throw new Error(messages.partialSave, { cause: error })
+        throw error
+      }
+    }
+
+    function SettingsTab({ scope, selectionScope, remote, t, view, useScope, useSelectionScope }) {
       if (view === 'summary') return 'CLIProxyAPI model gateway'
       const snapshot = useScope((value) => value)
+      const selectionSnapshot = useSelectionScope((value) => value)
       const profile = snapshot?.value?.providers?.[PROVIDER]
       const [baseURL, setBaseURL] = useState(DEFAULT_BASE_URL)
       const [apiKey, setApiKey] = useState('')
       const [credentialStatus, setCredentialStatus] = useState('unknown')
       const [saving, setSaving] = useState(false)
       const [feedback, setFeedback] = useState({ text: '', error: false })
+      const [models, setModels] = useState(undefined)
+      const [draft, setDraft] = useState({})
+      const [loadingModels, setLoadingModels] = useState(false)
+      const requestGeneration = React.useRef(0)
       const readOnly = snapshot?.status === 'ready' && !snapshot.writable
-      const canSave = snapshot?.status === 'ready' && snapshot.writable && !saving
-
+      const selectionReady = selectionSnapshot?.status === 'ready' && selectionSnapshot.writable
+      const canSave = snapshot?.status === 'ready' && snapshot.writable && selectionReady && !saving && !loadingModels
       useEffect(() => {
         if (snapshot?.status !== 'ready') return
         setBaseURL(typeof profile?.baseURL === 'string' && profile.baseURL.length > 0 ? profile.baseURL : DEFAULT_BASE_URL)
-      }, [profile?.baseURL, snapshot?.revision, snapshot?.status])
+      }, [profile?.baseURL, snapshot?.status])
 
       useEffect(() => {
         let active = true
@@ -230,6 +332,36 @@ window.__ModuleLoader__.load({
           dispose()
         }
       }, [remote])
+      const loadModels = async (sourceURL = baseURL, sourceKey = apiKey) => {
+        const generation = ++requestGeneration.current
+        setLoadingModels(true)
+        setFeedback({ text: '', error: false })
+        try {
+          const url = sourceURL.trim().replace(/\/+$/, '')
+          validBaseURL(url, { baseRequired: t('baseRequired'), baseInvalid: t('baseInvalid') })
+          const result = await discoverModels(remote, url, sourceKey.trim(), { loadFailed: t('loadFailed'), noModels: t('noModels') })
+          if (generation === requestGeneration.current) setModels(result)
+        } catch (error) {
+          if (generation === requestGeneration.current) {
+            setModels(undefined)
+            setFeedback({ text: error instanceof Error ? error.message : t('loadFailed'), error: true })
+          }
+        } finally {
+          if (generation === requestGeneration.current) setLoadingModels(false)
+        }
+      }
+
+      useEffect(() => {
+        if (snapshot?.status === 'ready' && profile?.baseURL) void loadModels(profile.baseURL, '')
+        return () => { requestGeneration.current += 1 }
+      }, [profile?.baseURL, snapshot?.status])
+
+      const invalidateModels = () => {
+        requestGeneration.current += 1
+        setModels(undefined)
+        setLoadingModels(false)
+      }
+
 
       const submit = async (event) => {
         event.preventDefault()
@@ -244,15 +376,21 @@ window.__ModuleLoader__.load({
             baseInvalid: t('baseInvalid'),
             noModels: t('noModels'),
           })
-          await installInitialProfile(remote, scope, nextBaseURL, nextApiKey, {
+          await installInitialProfile(remote, scope, selectionScope, nextBaseURL, nextApiKey, draft, {
             noModels: t('noModels'),
+            loadFailed: t('loadFailed'),
+            needOneModel: t('needOneModel'),
+            selectionUnavailable: t('selectionUnavailable'),
             saveFailed: t('saveFailed'),
+            partialSave: t('partialSave'),
             syncTimeout: t('syncTimeout'),
           })
           setApiKey('')
+          setDraft({})
           setFeedback({ text: t('saved'), error: false })
         } catch (error) {
-          setFeedback({ text: error instanceof Error ? error.message : String(error), error: true })
+          const safeMessages = ['baseRequired', 'baseInvalid', 'noModels', 'loadFailed', 'needOneModel', 'selectionUnavailable', 'saveFailed', 'partialSave', 'syncTimeout'].map((key) => t(key))
+          setFeedback({ text: error instanceof Error && safeMessages.includes(error.message) ? error.message : t('partialSave'), error: true })
         } finally {
           setSaving(false)
         }
@@ -272,7 +410,7 @@ window.__ModuleLoader__.load({
           React.createElement('p', { style: styles.status, role: 'note' }, t('imageCapability')),
           React.createElement('label', { style: styles.field },
             React.createElement('span', { style: styles.label }, t('baseURL')),
-            React.createElement('input', { style: styles.input, type: 'url', value: baseURL, autoComplete: 'url', disabled: !canSave, onChange: (event) => setBaseURL(event.currentTarget.value) }),
+            React.createElement('input', { style: styles.input, type: 'url', value: baseURL, autoComplete: 'url', disabled: !canSave, onChange: (event) => { invalidateModels(); setBaseURL(event.currentTarget.value) } }),
           ),
           React.createElement('label', { style: styles.field },
             React.createElement('span', { style: styles.labelRow },
@@ -280,7 +418,24 @@ window.__ModuleLoader__.load({
               credentialStatus === 'configured'
                 ? React.createElement('span', { style: styles.credentialStatus, role: 'status' }, t('credentialConfiguredLabel')) : null,
             ),
-            React.createElement('input', { style: styles.input, type: 'password', value: apiKey, placeholder: credentialStatus === 'configured' ? t('apiKeyConfiguredPlaceholder') : t('apiKeyPlaceholder'), autoComplete: 'off', disabled: !canSave, onChange: (event) => setApiKey(event.currentTarget.value) }),
+            React.createElement('input', { style: styles.input, type: 'password', value: apiKey, placeholder: credentialStatus === 'configured' ? t('apiKeyConfiguredPlaceholder') : t('apiKeyPlaceholder'), autoComplete: 'off', disabled: !canSave, onChange: (event) => { invalidateModels(); setApiKey(event.currentTarget.value) } }),
+          ),
+          !selectionReady ? React.createElement('p', { style: styles.status, role: 'status' }, t('selectionUnavailable')) : null,
+          React.createElement('div', { style: styles.field },
+            React.createElement('span', { style: styles.label }, t('models')),
+            React.createElement('p', { style: styles.status, role: 'note' }, t('modelsHelp')),
+            React.createElement('p', { style: styles.status, role: 'note' }, t('metadataHelp')),
+            models && models.every((model) => (Object.prototype.hasOwnProperty.call(draft, model.id) ? draft[model.id] : selectionSnapshot.value?.modelSelection?.[model.id] !== false) === false) && profile
+              ? React.createElement('p', { style: styles.statusError, role: 'alert' }, t('noEnabledRefresh')) : null,
+            React.createElement('button', { type: 'button', style: styles.button, disabled: !canSave, onClick: () => loadModels() }, loadingModels ? t('loadingModels') : t('loadModels')),
+            models ? React.createElement('div', { style: styles.modelList }, models.map((model) => {
+              const selected = Object.prototype.hasOwnProperty.call(draft, model.id) ? draft[model.id] : selectionSnapshot.value?.modelSelection?.[model.id] !== false
+              const metadata = [model.id, model.contextWindow && `context: ${model.contextWindow}`, model.maxTokens && `output: ${model.maxTokens}`, (model.inputModalities || []).join(', ')].filter(Boolean).join(' · ')
+              return React.createElement('label', { key: model.id, style: styles.model },
+                React.createElement('input', { type: 'checkbox', checked: selected, disabled: !canSave, onChange: (event) => { const checked = event.currentTarget.checked; setDraft((current) => ({ ...current, [model.id]: checked })) } }),
+                React.createElement('span', null, model.name || model.id, React.createElement('small', { style: { ...styles.status, display: 'block' } }, metadata)),
+              )
+            })) : null,
           ),
           feedback.text ? React.createElement('p', { style: feedback.error ? styles.statusError : styles.status, role: feedback.error ? 'alert' : 'status' }, feedback.text) : null,
           React.createElement('div', { style: styles.actions },
@@ -295,6 +450,7 @@ window.__ModuleLoader__.load({
       const locale = ctx.locale
       const configForms = ctx.configForms
       const scope = configForms.get(PI_NS)
+      const selectionScope = configForms.get(DISCOVERY_NS)
       const t = locale.bind(SETTINGS_LOCALE_NS)
       const pluginT = locale.bind(SETTINGS_SUMMARY_NS)
 
@@ -303,7 +459,7 @@ window.__ModuleLoader__.load({
         en: { title: 'CLIProxyAPI', description: 'Connect to a CLIProxyAPI model gateway.' },
         zh: { title: 'CLIProxyAPI', description: '连接 CLIProxyAPI 模型网关。' },
       }), 'dsh-provider-cpa: Plugins page copy')
-      ctx.effect(() => configForms.whileServed([PI_NS], () => ctx.slots.inject(SETTINGS_SLOT, () => ctx.slots.register({
+      ctx.effect(() => configForms.whileServed([PI_NS, DISCOVERY_NS], () => ctx.slots.inject(SETTINGS_SLOT, () => ctx.slots.register({
         name: SETTINGS_SLOT,
         id: SETTINGS_TAB_ID,
         order: 30,
@@ -313,8 +469,9 @@ window.__ModuleLoader__.load({
         inject: () => ({
           remote,
           scope,
+          selectionScope,
           t,
-          hooks: { scope },
+          hooks: { scope, selectionScope },
         }),
       }, SettingsTab))), 'dsh-provider-cpa: settings page')
     }

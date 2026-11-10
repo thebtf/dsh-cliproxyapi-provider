@@ -39,6 +39,8 @@ function managedProfile(overrides = {}) {
 
 function createContext(initialSection, initialCredential) {
   let section = initialSection
+  let revision = 0
+  let selection = {}
   let credential = initialCredential
   const discoveries = new Map()
   const listeners = new Map()
@@ -59,9 +61,14 @@ function createContext(initialSection, initialCredential) {
     },
     settings: {
       describe() {
-        return [{ ns: 'llm-pi-ai', value: section }]
+        return [{ ns: 'llm-pi-ai', value: section, revision }, { ns: 'llm-cliproxyapi', value: { modelSelection: selection } }]
       },
-      async mutate(_ns, ops) {
+      async mutate(_ns, ops, expectedRevision) {
+        if (expectedRevision !== undefined && expectedRevision !== revision) {
+          const error = new Error('Settings revision conflict')
+          error.code = 'SETTINGS_CONFLICT'
+          throw error
+        }
         mutations.push(ops)
         const providers = { ...(section.providers || {}) }
         for (const op of ops) {
@@ -70,6 +77,7 @@ function createContext(initialSection, initialCredential) {
           else delete providers[op.path[1]]
         }
         section = { ...section, providers }
+        revision += 1
       },
     },
     credentials: {
@@ -111,7 +119,8 @@ function createContext(initialSection, initialCredential) {
     warnings,
     timeouts,
     get section() { return section },
-    setSection(value) { section = value },
+    setSection(value) { section = value; revision += 1 },
+    setSelection(value) { selection = value },
     setCredential(value) { credential = value },
     emit(event, ...args) {
       for (const listener of listeners.get(event) || []) listener(...args)
@@ -426,6 +435,50 @@ test('credential removal regenerates the profile in keyless mode', async () => {
   }
 })
 
+test('a conflicting profile write is retried from the latest revision without losing concurrent edits', async () => {
+  const previousFetch = globalThis.fetch
+  let fetches = 0
+  globalThis.fetch = async () => {
+    fetches += 1
+    return new Response(JSON.stringify({ models: [{ slug: 'model-a' }] }), { status: 200 })
+  }
+  const harness = createContext({ providers: { CLIProxyAPI: managedProfile() } })
+  const mutate = harness.ctx.settings.mutate
+  const revisions = []
+  harness.ctx.settings.mutate = async (ns, ops, expectedRevision) => {
+    revisions.push(expectedRevision)
+    if (revisions.length === 1) {
+      harness.setSection({
+        providers: {
+          CLIProxyAPI: managedProfile({
+            headers: { 'X-Concurrent': 'preserved' }, defaultContextWindow: 9000,
+          })
+        }
+      })
+    }
+    return mutate(ns, ops, expectedRevision)
+  }
+  try {
+    apply(harness.ctx, await resolvedConfig({ retryInitialMs: 20, retryMaxMs: 20 }))
+    await waitFor(() => harness.timeouts.some((row) => row.delay === 20))
+    assert.equal(harness.mutations.length, 0)
+    assert.equal(harness.section.providers.CLIProxyAPI.headers['X-Concurrent'], 'preserved')
+    harness.timeouts.find((row) => row.delay === 20).callback()
+    await waitFor(() => harness.mutations.length === 1)
+    assert.deepEqual(revisions, [0, 1])
+    const profile = harness.section.providers.CLIProxyAPI
+    assert.equal(profile.headers['X-Concurrent'], 'preserved')
+    assert.equal(profile.defaultContextWindow, 9000)
+    assert.deepEqual(profile.models.map((model) => model.id), ['model-a'])
+    harness.emit('settings/document-updated', 'llm-pi-ai')
+    await new Promise((resolve) => setTimeout(resolve, 25))
+    assert.equal(fetches, 2)
+  } finally {
+    harness.dispose()
+    globalThis.fetch = previousFetch
+  }
+})
+
 test('a newer settings change aborts stale discovery and only installs the latest profile', async () => {
   const previousFetch = globalThis.fetch
   let markFirstStarted
@@ -501,14 +554,16 @@ test('real Cordis composition leaves llm-pi-ai as the sole directory owner', asy
   class MemorySettings extends Service {
     constructor(ctx) { super(ctx, 'settings') }
     configure() { return () => { } }
-    describe() { return [{ ns: 'llm-pi-ai', value: structuredClone(document['llm-pi-ai']) }] }
-    async mutate(ns, ops) {
+    describe() { return [{ ns: 'llm-pi-ai', value: structuredClone(document['llm-pi-ai']), revision: this.revision ?? 0 }] }
+    async mutate(ns, ops, expectedRevision) {
+      if (expectedRevision !== undefined) assert.equal(expectedRevision, this.revision ?? 0)
       assert.equal(ns, 'llm-pi-ai')
       for (const op of ops) {
         assert.equal(op.op, 'set')
         assert.deepEqual(op.path, ['providers', 'CLIProxyAPI'])
         document[ns].providers.CLIProxyAPI = structuredClone(op.value)
       }
+      this.revision = (this.revision ?? 0) + 1
       this.ctx.emit('settings/document-updated', ns, 1)
     }
   }
@@ -589,6 +644,7 @@ test('real Cordis composition leaves llm-pi-ai as the sole directory owner', asy
       path: ['providers', 'CLIProxyAPI'],
       value: managedProfile({
         models: discovered,
+        modelOverrides: { think: { name: 'Unsupported override' } },
         headers: {
           [PROFILE_SYNC_HEADER]: 'rich:integration-test',
           authorization: PLACEHOLDER_AUTHORIZATION,
@@ -606,6 +662,7 @@ test('real Cordis composition leaves llm-pi-ai as the sole directory owner', asy
     assert.equal(directories[0].settingsNs, 'llm-pi-ai')
     assert.equal(ctx.llm.listProviders().some((provider) => provider.id === 'CLIProxyAPI'), true)
     const models = ctx.settings.describe()[0].value.providers.CLIProxyAPI.models
+    assert.deepEqual(ctx.settings.describe()[0].value.providers.CLIProxyAPI.modelOverrides ?? {}, {})
     assert.equal(models[0].reasoningEfforts, undefined)
     assert.deepEqual(models[1].reasoningEfforts, { off: 'none', high: 'high' })
     assert.deepEqual(models[1].input, ['text', 'image'])
@@ -626,5 +683,73 @@ test('real Cordis composition leaves llm-pi-ai as the sole directory owner', asy
   } finally {
     globalThis.fetch = previousFetch
     for (const fiber of fibers.reverse()) await fiber.dispose().catch(() => { })
+  }
+})
+
+test('model selection survives catalog changes and settings updates without nested HMR writes', async () => {
+  const previousFetch = globalThis.fetch
+  const transaction = new AsyncLocalStorage()
+  let catalog = [{ slug: 'enabled' }, { slug: 'disabled' }]
+  globalThis.fetch = async () => new Response(JSON.stringify({ models: catalog }), { status: 200 })
+  const harness = createContext({
+    providers: {
+      CLIProxyAPI: managedProfile({
+        headers: { 'X-Custom': 'kept' }, compat: { supportsStore: false }, retryPolicy: { mode: 'always' },
+        modelOverrides: { enabled: { name: 'Custom' } }, defaultContextWindow: 9000,
+      })
+    }
+  })
+  let describes = 0
+  const describe = harness.ctx.settings.describe
+  harness.ctx.settings.describe = () => { describes++; return describe() }
+  harness.setSelection({ disabled: false, absent: false })
+  const mutate = harness.ctx.settings.mutate
+  harness.ctx.settings.mutate = async (...args) => {
+    if (transaction.getStore()) throw new Error('HMR transactions cannot be nested')
+    return mutate(...args)
+  }
+  try {
+    apply(harness.ctx, await resolvedConfig())
+    await waitFor(() => harness.mutations.length === 1)
+    assert.deepEqual(harness.section.providers.CLIProxyAPI.models.map((model) => model.id), ['enabled'])
+    assert.equal(harness.section.providers.CLIProxyAPI.headers['X-Custom'], 'kept')
+    assert.deepEqual(harness.section.providers.CLIProxyAPI.compat, { supportsStore: false, chatTemplateArgs: {}, chatTemplateKwargs: {} })
+    assert.deepEqual(harness.section.providers.CLIProxyAPI.retryPolicy, {
+      mode: 'always', backoff: { initialDelayMs: 500, maxDelayMs: 10000, jitterRatio: 0.1 },
+    })
+    assert.deepEqual(harness.section.providers.CLIProxyAPI.modelOverrides ?? {}, {})
+    assert.equal(harness.section.providers.CLIProxyAPI.defaultContextWindow, 9000)
+
+    catalog = [{ slug: 'disabled' }, { slug: 'absent' }, { slug: 'new' }]
+    const previousDescribes = describes
+    transaction.run(true, () => harness.emit('settings/document-updated', 'llm-cliproxyapi'))
+    await waitFor(() => harness.mutations.length === 2)
+    assert.deepEqual(harness.section.providers.CLIProxyAPI.models.map((model) => model.id), ['new'])
+    assert.equal(describes - previousDescribes, 1)
+
+    harness.setSelection({ disabled: true, absent: false })
+    harness.emit('settings/document-updated', 'llm-cliproxyapi')
+    await waitFor(() => harness.mutations.length === 3)
+    assert.deepEqual(harness.section.providers.CLIProxyAPI.models.map((model) => model.id), ['disabled', 'new'])
+  } finally {
+    harness.dispose()
+    globalThis.fetch = previousFetch
+  }
+})
+
+test('an empty enabled catalog leaves the existing provider intact and reports the failure', async () => {
+  const previousFetch = globalThis.fetch
+  globalThis.fetch = async () => new Response(JSON.stringify({ models: [{ slug: 'disabled' }] }), { status: 200 })
+  const harness = createContext({ providers: { CLIProxyAPI: managedProfile() } })
+  harness.setSelection({ disabled: false })
+  try {
+    apply(harness.ctx, await resolvedConfig())
+    await waitFor(() => harness.warnings.length > 0)
+    assert.match(harness.warnings[0], /no enabled models/)
+    assert.equal(harness.mutations.length, 0)
+    assert.equal(harness.section.providers.CLIProxyAPI.models[0].id, 'old')
+  } finally {
+    harness.dispose()
+    globalThis.fetch = previousFetch
   }
 })

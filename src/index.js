@@ -28,6 +28,7 @@ export const Config = z.object({
   fetchTimeoutMs: z.number().step(1).min(1).default(15000),
   retryInitialMs: z.number().step(1).min(1).default(3000),
   retryMaxMs: z.number().step(1).min(1).default(60000),
+  modelSelection: z.dict(z.boolean()).default({}).volatile(),
   refreshIntervalMs: z.number().step(1).min(0).default(300000),
 })
 
@@ -65,9 +66,14 @@ function profileHasRichBootstrap(profile) {
 }
 
 function mergedHeadersOf(profileHeaders, configuredHeaders) {
-  const headers = { ...configuredHeaders, ...profileHeaders }
-  const sync = headerKey(headers, PROFILE_SYNC_HEADER)
-  if (sync !== undefined) delete headers[sync]
+  const headers = {}
+  for (const source of [configuredHeaders, profileHeaders]) {
+    for (const [key, value] of Object.entries(source ?? {})) {
+      const existing = headerKey(headers, key)
+      if (existing !== undefined) delete headers[existing]
+      if (key.toLowerCase() !== PROFILE_SYNC_HEADER) headers[key] = value
+    }
+  }
   return headers
 }
 
@@ -226,9 +232,9 @@ async function profileOf(profile, models, hasApiKey, config) {
     api: 'openai-responses',
     baseURL: normalizedBaseURL(profile.baseURL),
     models,
-    defaultContextWindow: config.defaultContextWindow,
-    defaultMaxTokens: config.defaultMaxTokens,
-    defaultInput: [...config.defaultInput],
+    defaultContextWindow: profile.defaultContextWindow ?? config.defaultContextWindow,
+    defaultMaxTokens: profile.defaultMaxTokens ?? config.defaultMaxTokens,
+    defaultInput: [...(profile.defaultInput ?? config.defaultInput)],
     headers: profileHeadersOf(profile.headers, config.headers, hasApiKey),
     ...(hasApiKey ? { apiKeyEnv: API_KEY_REF } : {}),
   }
@@ -266,6 +272,9 @@ export function apply(ctx, config) {
   // exposed by settings.describe(), rather than a settings.get() section.
   const currentProfile = () => ctx.settings.describe()
     .find((entry) => entry.ns === PI_NS)?.value?.providers?.[PROVIDER]
+
+  const currentSelection = (settings) => settings
+    .find((entry) => entry.ns === DISCOVERY_NS)?.value?.modelSelection ?? config.modelSelection?.get?.() ?? {}
 
   const discoveryHandoffs = new Map()
 
@@ -309,8 +318,11 @@ export function apply(ctx, config) {
 
   const synchronize = async (signal, authOnly = false) => {
     const activeConfig = currentConfig()
-    const profile = currentProfile()
+    const settings = ctx.settings.describe()
+    const descriptor = settings.find((entry) => entry.ns === PI_NS)
+    const profile = descriptor?.value?.providers?.[PROVIDER]
     if (!profile) return false
+    if (!Number.isSafeInteger(descriptor.revision)) throw new Error('CLIProxyAPI cannot synchronize without a settings revision')
     if (authOnly && profileSynchronizationPending(profile)) return true
     if (signal.aborted) throw signal.reason
     const hasApiKey = async () => (await optionalApiKey(ctx)) !== undefined
@@ -326,14 +338,27 @@ export function apply(ctx, config) {
       catalog = await catalogFor(profile, signal, activeConfig)
     }
     if (signal.aborted) throw signal.reason
-    const next = await profileOf(profile, catalog.models, catalog.hasApiKey, activeConfig)
+    const selection = authOnly ? undefined : currentSelection(settings)
+    const enabledModels = authOnly ? catalog.models : catalog.models.filter((model) => selection[model.id] !== false)
+    if (!enabledModels.length) throw new Error('CLIProxyAPI has no enabled models in the current catalog; the existing profile was not changed')
+    const next = await profileOf(profile, enabledModels, catalog.hasApiKey, activeConfig)
+    if (signal.aborted) throw signal.reason
+    const nextRefreshKey = refreshKeyOf(next, activeConfig)
     if (!deepEqualJson(next, profile)) {
-      observedRefreshKey = refreshKeyOf(next, activeConfig)
-      await ctx.settings.mutate(PI_NS, [{
-        op: 'set',
-        path: ['providers', PROVIDER],
-        value: next,
-      }])
+      const previousRefreshKey = observedRefreshKey
+      observedRefreshKey = nextRefreshKey
+      try {
+        await ctx.settings.mutate(PI_NS, [{
+          op: 'set',
+          path: ['providers', PROVIDER],
+          value: next,
+        }], descriptor.revision)
+      } catch (error) {
+        if (observedRefreshKey === nextRefreshKey) observedRefreshKey = previousRefreshKey
+        throw error
+      }
+    } else {
+      observedRefreshKey = nextRefreshKey
     }
     return true
   }
@@ -417,6 +442,7 @@ export function apply(ctx, config) {
 
   ctx.on('settings/document-updated', (ns) => {
     if (ns === PI_NS) scheduleFromSettings()
+    else if (ns === DISCOVERY_NS) schedule()
   })
   ctx.on('credentials/reference-updated', (ref) => {
     if (ref === API_KEY_REF) schedule({ authOnly: true })
