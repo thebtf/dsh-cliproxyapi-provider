@@ -2,6 +2,22 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
+const primitives = { Button: 'button', Input: 'input', Checkbox: 'checkbox', Tag: 'tag' }
+const mockRequire = (React) => (id) => id === 'react' ? React : id === '@deepseek-ai/dsh-client-ui-primitives' ? primitives : assert.fail(`Unexpected module: ${id}`)
+const bindCatalog = (connection) => {
+  window.__DSH_TRANSPORT__ = {
+    async fetch(path, options) {
+      assert.equal(path, '/api/cliproxyapi/catalog')
+      assert.equal(options.method, 'POST')
+      assert.equal(options.credentials, 'same-origin')
+      assert.equal(options.cache, 'no-store')
+      assert.equal(options.headers['content-type'], 'application/json')
+      const result = await connection.rpc.call('/api', 'cliproxyapi/catalog', JSON.parse(options.body))
+      return { ok: true, async json() { return result } }
+    }
+  }
+}
+
 test('client bundle registers a served-namespace Plugins item', async () => {
   let definition
   globalThis.window = {
@@ -13,11 +29,8 @@ test('client bundle registers a served-namespace Plugins item', async () => {
   }
   try {
     await import('../client.js')
-    const plugin = definition.factory((id) => {
-      assert.equal(id, 'react')
-      return {}
-    })
-    assert.deepEqual(plugin.inject, ['slots', 'locale', 'remote', 'remote.llm', 'remote.credentials', 'configForms'])
+    const plugin = definition.factory(mockRequire({}))
+    assert.deepEqual(plugin.inject, ['slots', 'locale', 'remote', 'remote.credentials', 'configForms'])
 
     const registrations = []
     const injections = []
@@ -99,10 +112,10 @@ test('client follows the served pi-ai entry on the Plugins page', async () => {
   assert.match(source, /configForms\.whileServed/)
   assert.match(source, /slots\.inject\(SETTINGS_SLOT/)
   assert.match(source, /const DISCOVERY_NS = 'llm-cliproxyapi'/)
-  assert.match(source, /remote\.llm\.discoverModels\(DISCOVERY_NS/)
-  assert.match(source, /const inject = \['slots', 'locale', 'remote', 'remote\.llm', 'remote\.credentials', 'configForms'\]/)
-  assert.match(source, /label-inverse, #fff/)
-  assert.match(source, /fontWeight: 600/)
+  assert.match(source, /window\.__DSH_TRANSPORT__\?\.fetch/)
+  assert.match(source, /const inject = \['slots', 'locale', 'remote', 'remote\.credentials', 'configForms'\]/)
+  assert.match(source, /require\('@deepseek-ai\/dsh-client-ui-primitives'\)/)
+  assert.doesNotMatch(source, /label-inverse, #fff/)
   assert.match(source, /input: Array\.isArray\(model\.inputModalities\)[\s\S]*\? \[\.\.\.model\.inputModalities\][\s\S]*: \['text'\]/)
   assert.match(source, /imageCapability: '会根据模型目录中的图片能力声明自动启用图片输入。'/)
   assert.match(source, /role: 'note' }, t\('imageCapability'\)/)
@@ -134,10 +147,7 @@ test('saving uses the CLIProxyAPI discovery instead of the pi-ai generic listing
       useEffect() { },
       useRef(initial) { return { current: initial } },
     }
-    const plugin = definition.factory((id) => {
-      assert.equal(id, 'react')
-      return React
-    })
+    const plugin = definition.factory(mockRequire(React))
     let component
     const listeners = new Set()
     const scope = {
@@ -163,18 +173,20 @@ test('saving uses the CLIProxyAPI discovery instead of the pi-ai generic listing
       getSnapshot() { return this.snapshot },
       async mutate() { throw new Error('unchanged selection should not be written') },
     }
-    const remote = {
-      llm: {
-        async discoverModels(namespace, request) {
-          assert.equal(namespace, 'llm-cliproxyapi')
-          assert.equal(request.api, 'openai-responses')
-          return { ok: true, value: [{ id: 'thinking-model', name: 'Thinking Model' }] }
-        },
-      },
-      credentials: { async describe() { return { ok: true, value: {} } } },
+    const connection = {
+      rpc: {
+        async call(path, endpoint, request) {
+          assert.equal(path, '/api')
+          assert.equal(endpoint, 'cliproxyapi/catalog')
+          assert.deepEqual(request, { baseURL: 'http://127.0.0.1:8317/v1' })
+          return { ok: true, value: [{ id: 'thinking-model', name: 'Thinking Model', reasoningEfforts: { high: 'ultra' } }] }
+        }
+      }
     }
+    bindCatalog(connection)
+    const remote = { credentials: { async describe() { return { ok: true, value: {} } } } }
     plugin.apply({
-      remote,
+      remote, connection,
       configForms: {
         get(namespace) { return namespace === 'llm-cliproxyapi' ? selectionScope : scope },
         whileServed(_namespaces, register) { return register() },
@@ -187,7 +199,7 @@ test('saving uses the CLIProxyAPI discovery instead of the pi-ai generic listing
       effect(factory) { return factory() },
     })
     const tree = component({
-      scope, selectionScope, remote, t: (key) => key,
+      scope, selectionScope, remote, connection, t: (key) => key,
       useScope: () => ({ status: 'ready', writable: true, value: {} }),
       useSelectionScope: () => selectionScope.snapshot,
     })
@@ -195,6 +207,7 @@ test('saving uses the CLIProxyAPI discovery instead of the pi-ai generic listing
     assert.ok(form)
     const submitted = form.props.onSubmit({ preventDefault() { } })
     await new Promise((resolve) => setTimeout(resolve, 0))
+    assert.deepEqual(scope.mutations[0].value.models[0].reasoningEfforts, { high: 'ultra' })
     assert.equal(scope.mutations.length, 1)
     assert.equal(scope.mutations[0].value.headers['x-dsh-provider-cpa-sync'].startsWith('rich:'), true)
     assert.equal(scope.mutations[0].value.headers.Authorization, 'Bearer custom')
@@ -227,10 +240,7 @@ test('client uses direct remote results and writes the bootstrap through its bou
   }
   try {
     await import('../client.js?initial-profile-remote-test')
-    const plugin = definition.factory((id) => {
-      assert.equal(id, 'react')
-      return {}
-    })
+    const plugin = definition.factory(mockRequire({}))
     assert.equal(plugin.installInitialProfile, undefined)
     assert.equal(plugin.settingsTab, undefined)
   } finally {
@@ -299,20 +309,21 @@ test('model form retains absent choices and rejects disabling every model', asyn
       },
     }
     const remote = {
-      llm: { async discoverModels() { return { ok: true, value: [{ id: 'one', name: 'One' }, { id: 'two', name: 'Two' }] } } },
       credentials: {
         async describe() { return { ok: true, value: {} } },
         async set() { events.push('credential'); return { ok: !credentialFailure } },
       },
     }
-    definition.factory(() => React).apply({
-      remote,
+    const connection = { rpc: { async call(path, endpoint) { assert.equal(path, '/api'); assert.equal(endpoint, 'cliproxyapi/catalog'); return { ok: true, value: [{ id: 'one', name: 'One' }, { id: 'two', name: 'Two' }] } } } }
+    bindCatalog(connection)
+    definition.factory(mockRequire(React)).apply({
+      remote, connection,
       configForms: { get(ns) { return ns === 'llm-pi-ai' ? scope : selectionScope }, whileServed(_ns, fn) { return fn() } },
       locale: { bind() { return (key) => key }, register() { return () => { } } },
       slots: { inject(_name, fn) { return fn() }, register(_options, view) { component = view; return () => { } } },
       effect(fn) { return fn() },
     })
-    const render = () => { cursor = 0; return component({ scope, selectionScope, remote, t: (key) => key, useScope: () => scope.snapshot, useSelectionScope: () => selectionScope.snapshot }) }
+    const render = () => { cursor = 0; return component({ scope, selectionScope, remote, connection, t: (key) => key, useScope: () => scope.snapshot, useSelectionScope: () => selectionScope.snapshot }) }
     const find = (node, predicate) => {
       if (Array.isArray(node)) return node.flatMap((child) => find(child, predicate))
       if (!node || typeof node !== 'object') return []
@@ -321,18 +332,18 @@ test('model form retains absent choices and rejects disabling every model', asyn
     let tree = render()
     await find(tree, (node) => node.type === 'button' && node.props.type === 'button')[0].props.onClick()
     tree = render()
-    const checkboxes = find(tree, (node) => node.type === 'input' && node.props.type === 'checkbox')
+    const checkboxes = find(tree, (node) => node.type === 'checkbox')
     assert.equal(checkboxes.length, 2)
     assert.equal(checkboxes[0].props.checked, true)
-    checkboxes[0].props.onChange({ currentTarget: { checked: false } })
-    checkboxes[1].props.onChange({ currentTarget: { checked: false } })
+    checkboxes[0].props.onChange(false)
+    checkboxes[1].props.onChange(false)
     tree = render()
     await find(tree, (node) => node.type === 'form')[0].props.onSubmit({ preventDefault() { } })
     assert.equal(scope.mutations.length, 0)
     assert.equal(selectionScope.mutations.length, 0)
     assert.equal(states[4].text, 'needOneModel')
     tree = render()
-    find(tree, (node) => node.type === 'input' && node.props.type === 'checkbox')[1].props.onChange({ currentTarget: { checked: true } })
+    find(tree, (node) => node.type === 'checkbox')[1].props.onChange(true)
     find(tree, (node) => node.type === 'input' && node.props.type === 'password')[0].props.onChange({ currentTarget: { value: 'new-key' } })
     tree = render()
     const pending = find(tree, (node) => node.type === 'form')[0].props.onSubmit({ preventDefault() { } })
@@ -356,8 +367,8 @@ test('model form retains absent choices and rejects disabling every model', asyn
     tree = render()
     await find(tree, (node) => node.type === 'button' && node.props.type === 'button')[0].props.onClick()
     tree = render()
-    assert.deepEqual(find(tree, (node) => node.type === 'input' && node.props.type === 'checkbox').map((node) => node.props.checked), [false, true])
-    find(tree, (node) => node.type === 'input' && node.props.type === 'checkbox')[0].props.onChange({ currentTarget: { checked: true } })
+    assert.deepEqual(find(tree, (node) => node.type === 'checkbox').map((node) => node.props.checked), [false, true])
+    find(tree, (node) => node.type === 'checkbox')[0].props.onChange(true)
     find(tree, (node) => node.type === 'input' && node.props.type === 'password')[0].props.onChange({ currentTarget: { value: 'another-key' } })
     tree = render()
     await find(tree, (node) => node.type === 'form')[0].props.onSubmit({ preventDefault() { } })
@@ -431,22 +442,23 @@ for (const { changeURL, foreignEdit } of [{ changeURL: false }, { changeURL: tru
         },
       }
       const remote = {
-        llm: { async discoverModels() { return { ok: true, value: [{ id: 'one' }, { id: 'two' }] } } },
         credentials: { async describe() { return { ok: true, value: {} } } },
       }
+      const connection = { rpc: { async call(path, endpoint) { assert.equal(path, '/api'); assert.equal(endpoint, 'cliproxyapi/catalog'); return { ok: true, value: [{ id: 'one' }, { id: 'two' }] } } } }
+      bindCatalog(connection)
       let component
-      definition.factory(() => React).apply({
-        remote, configForms: { get(ns) { return ns === 'llm-pi-ai' ? scope : selectionScope }, whileServed(_ns, fn) { return fn() } },
+      definition.factory(mockRequire(React)).apply({
+        remote, connection, configForms: { get(ns) { return ns === 'llm-pi-ai' ? scope : selectionScope }, whileServed(_ns, fn) { return fn() } },
         locale: { bind() { return (key) => key }, register() { return () => { } } },
         slots: { inject(_name, fn) { return fn() }, register(_options, view) { component = view; return () => { } } },
         effect(fn) { return fn() },
       })
-      const render = () => { cursor = 0; return component({ scope, selectionScope, remote, t: (key) => key, useScope: () => scope.snapshot, useSelectionScope: () => selectionScope.snapshot }) }
+      const render = () => { cursor = 0; return component({ scope, selectionScope, remote, connection, t: (key) => key, useScope: () => scope.snapshot, useSelectionScope: () => selectionScope.snapshot }) }
       const find = (node, predicate) => Array.isArray(node) ? node.flatMap((child) => find(child, predicate)) : !node || typeof node !== 'object' ? [] : [...(predicate(node) ? [node] : []), ...find(node.children, predicate)]
       let tree = render()
       await find(tree, (node) => node.type === 'button' && node.props.type === 'button')[0].props.onClick()
       tree = render()
-      find(tree, (node) => node.type === 'input' && node.props.type === 'checkbox')[0].props.onChange({ currentTarget: { checked: false } })
+      find(tree, (node) => node.type === 'checkbox')[0].props.onChange(false)
       if (changeURL) find(tree, (node) => node.type === 'input' && node.props.type === 'url')[0].props.onChange({ currentTarget: { value: nextURL } })
       tree = render()
       const pending = find(tree, (node) => node.type === 'form')[0].props.onSubmit({ preventDefault() { } })
@@ -477,3 +489,78 @@ for (const { changeURL, foreignEdit } of [{ changeURL: false }, { changeURL: tru
     }
   })
 }
+
+test('catalog search, bulk choices and structured metadata preserve the draft', async () => {
+  let definition
+  globalThis.window = { __ModuleLoader__: { load(value) { definition = value } } }
+  try {
+    await import('../client.js?rich-catalog-test')
+    const states = []
+    let cursor = 0
+    const React = {
+      Fragment: 'fragment',
+      createElement(type, props, ...children) { return { type, props: props || {}, children } },
+      useState(initial) { const index = cursor++; if (!(index in states)) states[index] = initial; return [states[index], (next) => { states[index] = typeof next === 'function' ? next(states[index]) : next }] },
+      useRef(initial) { const index = cursor++; return states[index] ??= { current: initial } },
+      useEffect() { },
+    }
+    const malicious = '<img src=x onerror=alert(1)>'
+    const models = [
+      { id: 'one', name: 'Alpha', contextWindow: 10000, maxTokens: 500, inputModalities: ['text', 'image'], catalogSources: { contextWindow: 'default', maxTokens: 'cpa', inputModalities: 'cpa' }, reasoningEfforts: { max: 'ultra' }, catalogMetadata: { description: malicious, default_reasoning_level: 'ultra', supported_reasoning_levels: [{ effort: 'ultra', description: 'deep thought' }], extra: { nested: ['unknown field', malicious] } } },
+      { id: 'two', name: 'Beta', contextWindow: 20000, maxTokens: 1000, inputModalities: ['text'], catalogMetadata: {} },
+    ]
+    let fail = false
+    const connection = { rpc: { async call() { return fail ? { ok: false } : { ok: true, value: models } } } }
+    bindCatalog(connection)
+    let component
+    const scope = { snapshot: { status: 'ready', writable: true, revision: 1, value: {} }, getSnapshot() { return this.snapshot }, async mutate() { assert.fail('must not write empty catalog') } }
+    const selectionScope = { snapshot: { status: 'ready', writable: true, revision: 1, value: { modelSelection: { absent: false, two: false } } }, getSnapshot() { return this.snapshot }, async mutate() { assert.fail('must not write empty catalog') } }
+    const remote = { credentials: { async describe() { return { ok: true, value: {} } } } }
+    definition.factory(mockRequire(React)).apply({ remote, configForms: { get(ns) { return ns === 'llm-pi-ai' ? scope : selectionScope }, whileServed(_ns, fn) { return fn() } }, locale: { bind() { return (key) => key }, register() { return () => { } } }, slots: { inject(_name, fn) { return fn() }, register(_options, view) { component = view; return () => { } } }, effect(fn) { return fn() } })
+    const render = () => { cursor = 0; return component({ scope, selectionScope, remote, t: (key) => key, useScope: () => scope.snapshot, useSelectionScope: () => selectionScope.snapshot }) }
+    const find = (node, predicate) => Array.isArray(node) ? node.flatMap((child) => find(child, predicate)) : !node || typeof node !== 'object' ? [] : [...(predicate(node) ? [node] : []), ...find(node.children, predicate)]
+    const text = (node) => Array.isArray(node) ? node.map(text).join(' ') : node && typeof node === 'object' ? text(node.children) : String(node ?? '')
+    const button = (tree, label) => find(tree, (node) => node.type === 'button' && text(node) === label)[0]
+    let tree = render()
+    await button(tree, 'loadModels').props.onClick()
+    tree = render()
+    assert.deepEqual(find(tree, (node) => node.type === 'checkbox').map((node) => node.props.checked), [true, false])
+    assert.match(text(tree), /10,000.*sourceDefault/)
+    assert.match(text(tree), /deep thought/)
+    assert.match(text(tree), /defaultEffort.*ultra/)
+    assert.match(text(tree), /unknown field/)
+    assert.ok(text(tree).includes(malicious))
+    assert.equal(find(tree, (node) => node.type === 'img' || node.props?.dangerouslySetInnerHTML).length, 0)
+    assert.ok(find(tree, (node) => node.type === 'details').length >= 3)
+    assert.equal(find(tree, (node) => node.type === 'button' && node.props.variant === 'primary').length, 1)
+    find(tree, (node) => node.type === 'input' && node.props.type === 'search')[0].props.onChange({ currentTarget: { value: 'alpha' } })
+    tree = render()
+    assert.equal(find(tree, (node) => node.type === 'checkbox').length, 1)
+    button(tree, 'deselectAll').props.onClick()
+    tree = render()
+    assert.match(text(tree), /0\s+selectedCount\s+2/)
+    await find(tree, (node) => node.type === 'form')[0].props.onSubmit({ preventDefault() { } })
+    tree = render()
+    assert.match(text(tree), /needOneModel/)
+    button(tree, 'selectAll').props.onClick()
+    tree = render()
+    assert.match(text(tree), /2\s+selectedCount\s+2/)
+    find(tree, (node) => node.type === 'input' && node.props.type === 'search')[0].props.onChange({ currentTarget: { value: 'not-found' } })
+    tree = render()
+    assert.match(text(tree), /noMatches/)
+    fail = true
+    await button(tree, 'loadModels').props.onClick()
+    tree = render()
+    assert.match(text(tree), /loadFailed/)
+    assert.match(text(tree), /2\s+selectedCount\s+2/)
+    assert.deepEqual(selectionScope.snapshot.value.modelSelection, { absent: false, two: false })
+    scope.snapshot = { ...scope.snapshot, writable: false }
+    tree = render()
+    assert.match(text(tree), /readOnly/)
+    assert.equal(button(tree, 'selectAll').props.disabled, true)
+    scope.snapshot = { ...scope.snapshot, status: 'loading' }
+    tree = render()
+    assert.match(text(tree), /loading/)
+    assert.equal(tree.props['aria-busy'], true)
+  } finally { delete globalThis.window }
+})

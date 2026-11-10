@@ -1,17 +1,21 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { catalogURL, modelProfileOf, readCodexCatalog, reasoningEffortsOf } from '../src/catalog.js'
+import { catalogURL, modelProfileOf, readCodexCatalog, readCodexCatalogWithMetadata, reasoningEffortsOf } from '../src/catalog.js'
 
 test('maps Codex reasoning levels to Harness canonical levels', () => {
-  assert.deepEqual(reasoningEffortsOf({ supported_reasoning_levels: [
-    { effort: 'none' }, { effort: 'minimal' }, { effort: 'high' }, { effort: 'ultra' },
-  ] }), { off: 'none', minimal: 'minimal', high: 'high', max: 'ultra' })
+  assert.deepEqual(reasoningEffortsOf({
+    supported_reasoning_levels: [
+      { effort: 'none' }, { effort: 'minimal' }, { effort: 'high' }, { effort: 'ultra' },
+    ]
+  }), { off: 'none', minimal: 'minimal', high: 'high', max: 'ultra' })
 })
 
 test('omits an off-only reasoning capability rejected by llm-pi-ai', () => {
-  assert.equal(reasoningEffortsOf({ supported_reasoning_levels: [
-    { effort: 'none' }, { effort: 'off' },
-  ] }), undefined)
+  assert.equal(reasoningEffortsOf({
+    supported_reasoning_levels: [
+      { effort: 'none' }, { effort: 'off' },
+    ]
+  }), undefined)
 })
 
 test('maps model metadata and applies safe fallbacks', () => {
@@ -26,28 +30,30 @@ test('maps model metadata and applies safe fallbacks', () => {
 })
 
 test('extracts modalities and reasoning from the Codex catalog response', () => {
-  const models = readCodexCatalog({ models: [
-    {
-      slug: 'gpt-5.6-sol',
-      display_name: 'GPT 5.6 Sol',
-      max_context_window: 372000,
-      input_modalities: ['text', 'image'],
-      supported_reasoning_levels: [
-        { effort: 'low' },
-        { effort: 'medium' },
-        { effort: 'high' },
-        { effort: 'xhigh' },
-        { effort: 'max' },
-        { effort: 'ultra' },
-      ],
-    },
-    {
-      slug: 'gpt-5.6-spark',
-      display_name: 'GPT 5.6 Spark',
-      max_context_window: 128000,
-      input_modalities: ['text'],
-    },
-  ] }, { defaultContextWindow: 262144, defaultMaxTokens: 32768, defaultInput: ['text'] })
+  const models = readCodexCatalog({
+    models: [
+      {
+        slug: 'gpt-5.6-sol',
+        display_name: 'GPT 5.6 Sol',
+        max_context_window: 372000,
+        input_modalities: ['text', 'image'],
+        supported_reasoning_levels: [
+          { effort: 'low' },
+          { effort: 'medium' },
+          { effort: 'high' },
+          { effort: 'xhigh' },
+          { effort: 'max' },
+          { effort: 'ultra' },
+        ],
+      },
+      {
+        slug: 'gpt-5.6-spark',
+        display_name: 'GPT 5.6 Spark',
+        max_context_window: 128000,
+        input_modalities: ['text'],
+      },
+    ]
+  }, { defaultContextWindow: 262144, defaultMaxTokens: 32768, defaultInput: ['text'] })
 
   assert.deepEqual(models, [
     {
@@ -85,11 +91,13 @@ test('uses configured fallbacks when catalog capability fields are absent', () =
 })
 
 test('filters hidden models by default and deduplicates slugs', () => {
-  const models = readCodexCatalog({ models: [
-    { slug: 'visible', context_window: 1000 },
-    { slug: 'visible', context_window: 2000 },
-    { slug: 'hidden', visibility: 'hide', context_window: 3000 },
-  ] }, { defaultContextWindow: 262144, defaultMaxTokens: 32768, defaultInput: ['text'] })
+  const models = readCodexCatalog({
+    models: [
+      { slug: 'visible', context_window: 1000 },
+      { slug: 'visible', context_window: 2000 },
+      { slug: 'hidden', visibility: 'hide', context_window: 3000 },
+    ]
+  }, { defaultContextWindow: 262144, defaultMaxTokens: 32768, defaultInput: ['text'] })
   assert.deepEqual(models.map((model) => model.id), ['visible'])
 })
 
@@ -103,4 +111,33 @@ test('builds the Codex-compatible catalog URL', () => {
 test('rejects malformed and empty catalogs', () => {
   assert.throws(() => readCodexCatalog({ data: [] }), /no "models" array/)
   assert.throws(() => readCodexCatalog({ models: [] }), /no usable models/)
+})
+
+test('discovery preserves every CPA field without adding metadata to inference profiles', () => {
+  const entry = {
+    slug: 'rich-model', display_name: 'Rich Model', context_length: 128000,
+    max_output_tokens: 16000, input_modalities: ['text', 'image', 'audio'],
+    supported_reasoning_levels: [{ effort: 'low', description: 'Faster' }, { effort: 'xhigh', description: 'Thorough' }],
+    default_reasoning_level: 'low', supports_parallel_tool_calls: true,
+    extra_capability: { formats: ['json', 'text'], optional: null },
+    base_instructions: '<script>not executable</script>',
+  }
+  const { models, discovery } = readCodexCatalogWithMetadata({ models: [entry] })
+  assert.deepEqual(models, [modelProfileOf(entry)])
+  assert.equal(models[0].catalogMetadata, undefined)
+  assert.deepEqual(discovery[0].catalogMetadata, entry)
+  assert.deepEqual(discovery[0].catalogSources, { contextWindow: 'cpa', maxTokens: 'cpa', inputModalities: 'cpa' })
+  assert.deepEqual(discovery[0].reasoningEfforts, { low: 'low', xhigh: 'xhigh' })
+  assert.deepEqual(discovery[0].inputModalities, ['text', 'image'])
+  entry.extra_capability.formats.push('changed')
+  assert.deepEqual(discovery[0].catalogMetadata.extra_capability.formats, ['json', 'text'])
+})
+
+test('discovery identifies effective defaults rather than claiming they came from CPA', () => {
+  const { discovery } = readCodexCatalogWithMetadata({ models: [{ slug: 'minimal', context_window: -1, max_tokens: '100', input_modalities: ['audio'] }] }, {
+    defaultContextWindow: 262144, defaultMaxTokens: 32768, defaultInput: ['text'],
+  })
+  assert.deepEqual(discovery[0].catalogSources, { contextWindow: 'default', maxTokens: 'default', inputModalities: 'default' })
+  assert.equal(discovery[0].contextWindow, 262144)
+  assert.deepEqual(discovery[0].catalogMetadata.input_modalities, ['audio'])
 })

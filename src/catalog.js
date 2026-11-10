@@ -57,25 +57,40 @@ export function modelProfileOf(entry, options = {}) {
   return {
     id,
     name: nonEmptyString(entry?.display_name, entry?.name, entry?.description, id),
-    contextWindow: positiveInteger(entry?.max_context_window, entry?.context_window, options.defaultContextWindow),
+    contextWindow: positiveInteger(entry?.max_context_window, entry?.context_window, entry?.context_length, options.defaultContextWindow),
     maxTokens: positiveInteger(entry?.max_output_tokens, entry?.max_completion_tokens, entry?.max_tokens, options.defaultMaxTokens),
     input: inputModalitiesOf(entry, options.defaultInput ?? ['text']),
     ...(reasoningEfforts ? { reasoningEfforts } : {}),
   }
 }
 
-export function readCodexCatalog(body, options = {}) {
+export function readCodexCatalogWithMetadata(body, options = {}) {
   if (!body || !Array.isArray(body.models)) throw new TypeError('CLIProxyAPI model catalog has no "models" array')
   const models = []
+  const discovery = []
   const seen = new Set()
   for (const entry of body.models) {
     const model = modelProfileOf(entry, options)
     if (!model || seen.has(model.id)) continue
     seen.add(model.id)
     models.push(model)
+    discovery.push({
+      ...model,
+      inputModalities: [...model.input],
+      catalogMetadata: structuredClone(entry),
+      catalogSources: {
+        contextWindow: positiveInteger(entry.max_context_window, entry.context_window, entry.context_length) ? 'cpa' : 'default',
+        maxTokens: positiveInteger(entry.max_output_tokens, entry.max_completion_tokens, entry.max_tokens) ? 'cpa' : 'default',
+        inputModalities: Array.isArray(entry.input_modalities) && entry.input_modalities.some((value) => ['text', 'image'].includes(nonEmptyString(value)?.toLowerCase())) ? 'cpa' : 'default',
+      },
+    })
   }
   if (!models.length) throw new TypeError('CLIProxyAPI model catalog contains no usable models')
-  return models
+  return { models, discovery }
+}
+
+export function readCodexCatalog(body, options = {}) {
+  return readCodexCatalogWithMetadata(body, options).models
 }
 
 export function catalogURL(baseURL) {

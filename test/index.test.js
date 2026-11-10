@@ -12,6 +12,7 @@ import {
 } from '@deepseek-ai/dsh-llm-pi-ai'
 import {
   Config,
+  CATALOG_PATH,
   PLACEHOLDER_AUTHORIZATION,
   PROFILE_SYNC_HEADER,
   apply,
@@ -44,12 +45,21 @@ function createContext(initialSection, initialCredential) {
   let credential = initialCredential
   const discoveries = new Map()
   const listeners = new Map()
+  const routes = new Map()
   const mutations = []
   const warnings = []
   const effects = []
   const timeouts = []
 
   const ctx = {
+    connection: {
+      fetch: {
+        register(route) {
+          routes.set(route.path, route)
+          return () => routes.delete(route.path)
+        },
+      },
+    },
     llm: {
       registerModelDiscovery(ns, handler) {
         discoveries.set(String(ns), handler)
@@ -115,6 +125,7 @@ function createContext(initialSection, initialCredential) {
   return {
     ctx,
     discoveries,
+    routes,
     mutations,
     warnings,
     timeouts,
@@ -183,9 +194,72 @@ test('initial discovery requests the fixed rich catalog and returns full capabil
       input: ['text', 'image'],
       inputModalities: ['text', 'image'],
       reasoningEfforts: { low: 'low', high: 'high' },
+      catalogMetadata: {
+        slug: 'gpt-5.6-sol', display_name: 'GPT 5.6 Sol', max_context_window: 372000,
+        input_modalities: ['text', 'image'],
+        supported_reasoning_levels: [{ effort: 'low' }, { effort: 'high' }],
+      },
+      catalogSources: { contextWindow: 'cpa', maxTokens: 'default', inputModalities: 'cpa' },
     })
     harness.dispose()
   } finally {
+    globalThis.fetch = previousFetch
+  }
+})
+
+test('full catalog route preserves reasoning and unknown metadata through an authenticated Connection route', async () => {
+  const previousFetch = globalThis.fetch
+  const entry = {
+    slug: 'rich-route', max_context_window: 200000, max_output_tokens: 32000,
+    supported_reasoning_levels: [{ effort: 'low', description: 'Fast' }, { effort: 'high', description: 'Thorough' }],
+    default_reasoning_level: 'high', custom: { formats: ['text', 'json'] },
+  }
+  globalThis.fetch = async () => Response.json({ models: [entry] })
+  const harness = createContext({ providers: {} })
+  try {
+    apply(harness.ctx, await resolvedConfig())
+    const route = harness.routes.get(CATALOG_PATH)
+    assert.deepEqual(route.methods, ['POST'])
+    assert.equal(route.requestBody, 'buffered')
+    const response = await route.fetch(new Request('http://host' + CATALOG_PATH, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ baseURL: 'http://127.0.0.1:8317/v1' }),
+    }))
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('cache-control'), 'no-store')
+    const body = await response.json()
+    assert.equal(body.ok, true)
+    assert.deepEqual(body.value[0].catalogMetadata, entry)
+    assert.deepEqual(body.value[0].reasoningEfforts, { low: 'low', high: 'high' })
+    assert.deepEqual(body.value[0].catalogSources, { contextWindow: 'cpa', maxTokens: 'cpa', inputModalities: 'default' })
+    assert.equal(harness.mutations.length, 0)
+  } finally {
+    harness.dispose()
+    globalThis.fetch = previousFetch
+  }
+})
+
+test('full catalog route refuses malformed, oversized and unexpected fields without upstream requests', async () => {
+  const previousFetch = globalThis.fetch
+  let calls = 0
+  globalThis.fetch = async () => { calls += 1; throw new Error('must not fetch') }
+  const harness = createContext({ providers: {} })
+  try {
+    apply(harness.ctx, await resolvedConfig())
+    const route = harness.routes.get(CATALOG_PATH)
+    for (const [body, type, status] of [
+      ['{}', 'text/plain', 415], ['{', 'application/json', 400],
+      [JSON.stringify({ baseURL: 'http://host/v1', extra: true }), 'application/json', 400],
+      [JSON.stringify({ baseURL: 'http://host/v1', apiKey: 123 }), 'application/json', 400],
+      [JSON.stringify({ baseURL: 'http://host/v1', apiKey: 'x'.repeat(17000) }), 'application/json', 400],
+    ]) {
+      const response = await route.fetch(new Request('http://host' + CATALOG_PATH, { method: 'POST', headers: { 'content-type': type }, body }))
+      assert.equal(response.status, status)
+      assert.equal((await response.json()).ok, false)
+    }
+    assert.equal(calls, 0)
+  } finally {
+    harness.dispose()
     globalThis.fetch = previousFetch
   }
 })

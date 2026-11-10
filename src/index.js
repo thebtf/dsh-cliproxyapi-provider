@@ -4,7 +4,7 @@ import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { assertUsableApiKey, attributionHeaders } from '@deepseek-ai/dsh-llm'
 import { Config as PiAiConfig } from '@deepseek-ai/dsh-llm-pi-ai'
 import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
-import { catalogURL, readCodexCatalog } from './catalog.js'
+import { catalogURL, readCodexCatalogWithMetadata } from './catalog.js'
 
 const MAX_CATALOG_BYTES = 4 * 1024 * 1024
 const DISCOVERY_HANDOFF_TTL_MS = 60_000
@@ -16,6 +16,7 @@ const PROVIDER = 'CLIProxyAPI'
 
 export const PROFILE_SYNC_HEADER = 'x-dsh-provider-cpa-sync'
 export const PLACEHOLDER_AUTHORIZATION = 'Bearer dsh-cliproxyapi-no-key'
+export const CATALOG_PATH = '/api/cliproxyapi/catalog'
 
 export const name = DISCOVERY_NS
 export const inject = ['settings', 'credentials', 'llm', 'timer']
@@ -124,11 +125,11 @@ function timedSignal(parent, timeoutMs) {
   }
 }
 
-async function readBoundedJson(response) {
+async function readBoundedJson(response, maxBytes = MAX_CATALOG_BYTES) {
   const declared = Number(response.headers.get('content-length') ?? Number.NaN)
-  if (Number.isFinite(declared) && declared > MAX_CATALOG_BYTES) {
+  if (Number.isFinite(declared) && declared > maxBytes) {
     await response.body?.cancel()
-    throw new Error('CLIProxyAPI model catalog exceeds 4 MiB')
+    throw new Error('CLIProxyAPI JSON exceeds ' + maxBytes + ' bytes')
   }
   if (!response.body) return JSON.parse(await response.text())
   const reader = response.body.getReader()
@@ -139,7 +140,7 @@ async function readBoundedJson(response) {
       const part = await reader.read()
       if (part.done) break
       total += part.value.byteLength
-      if (total > MAX_CATALOG_BYTES) throw new Error('CLIProxyAPI model catalog exceeds 4 MiB')
+      if (total > maxBytes) throw new Error('CLIProxyAPI JSON exceeds ' + maxBytes + ' bytes')
       chunks.push(part.value)
     }
   } finally {
@@ -188,7 +189,7 @@ async function discoverCatalog(ctx, options, suppliedApiKey, parentSignal) {
     }
     try {
       return {
-        models: readCodexCatalog(body, options),
+        ...readCodexCatalogWithMetadata(body, options),
         hasApiKey: apiKey !== undefined,
       }
     } catch (error) {
@@ -300,7 +301,7 @@ export function apply(ctx, config) {
     return handoff.models
   }
 
-  ctx.llm.registerModelDiscovery(DISCOVERY_NS, async (request, signal) => {
+  const discoverModels = async (request, signal) => {
     const activeConfig = currentConfig()
     const catalog = await discoverCatalog(ctx, {
       baseURL: request.baseURL,
@@ -311,8 +312,36 @@ export function apply(ctx, config) {
       fetchTimeoutMs: activeConfig.fetchTimeoutMs,
     }, request.apiKey, signal ?? request.signal)
     rememberDiscovery(request.baseURL, catalog.models)
-    return catalog.models.map((model) => ({ ...model, inputModalities: [...model.input] }))
-  })
+    return catalog.discovery
+  }
+  ctx.llm.registerModelDiscovery(DISCOVERY_NS, discoverModels)
+
+  ctx.inject(['connection'], (web) => web.connection.fetch.register({
+    path: CATALOG_PATH,
+    methods: ['POST'],
+    requestBody: 'buffered',
+    async fetch(request) {
+      const reply = (status, result) => Response.json(result, { status, headers: { 'cache-control': 'no-store' } })
+      const failure = (status, code) => reply(status, { ok: false, error: { code, message: 'Could not load the CLIProxyAPI model catalog', details: {} } })
+      if (request.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase() !== 'application/json') return failure(415, 'cliproxyapi/invalid-request')
+      let input
+      try {
+        input = await readBoundedJson(request, 16 * 1024)
+      } catch {
+        return failure(400, 'cliproxyapi/invalid-request')
+      }
+      if (!input || typeof input !== 'object' || Array.isArray(input) ||
+        Object.keys(input).some((key) => key !== 'baseURL' && key !== 'apiKey') ||
+        typeof input.baseURL !== 'string' || input.baseURL.length > 4096 ||
+        (input.apiKey !== undefined && typeof input.apiKey !== 'string')) return failure(400, 'cliproxyapi/invalid-request')
+      try {
+        const models = await discoverModels(input, request.signal)
+        return reply(200, { ok: true, value: models })
+      } catch {
+        return failure(502, 'cliproxyapi/catalog-rejected')
+      }
+    },
+  }))
 
   let observedRefreshKey
 

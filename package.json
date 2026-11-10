@@ -1,6 +1,6 @@
 {
   "name": "@router-for-me/dsh-cliproxyapi-provider",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "GUI-configurable CLIProxyAPI Responses provider for DeepSeek Harness",
   "type": "module",
   "main": "./src/index.js",
@@ -34,6 +34,7 @@
       "inject": [
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-primitives",
         "@deepseek-ai/dsh-client-ui-plugin-manager",
         "@deepseek-ai/dsh-api-remotes"
       ],
@@ -59,6 +60,7 @@
     "@deepseek-ai/dsh-api-remotes": "0.2.2-rc.1",
     "@deepseek-ai/dsh-client-locale": "0.2.2-rc.1",
     "@deepseek-ai/dsh-client-ui-settings": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.2.2-rc.1",
     "@deepseek-ai/dsh-client-ui-plugin-manager": "0.2.2-rc.1",
     "@deepseek-ai/dsh-client-ui-slots": "0.2.2-rc.1",
     "react": "^18.2.0"
