@@ -9,6 +9,7 @@
     "./client": "./client.js",
     "./catalog": "./src/catalog.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
     "./package.json": "./package.json"
   },
   "files": [
