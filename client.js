@@ -155,6 +155,7 @@ window.__ModuleLoader__.load({
         displayName: PROVIDER,
         api: 'openai-responses',
         baseURL,
+        compat: { ...previous.compat, supportsStrictMode: true },
         models: models.map((model) => ({
           id: model.id,
           name: model.name || model.id,
