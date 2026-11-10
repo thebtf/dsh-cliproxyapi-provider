@@ -6,6 +6,7 @@ window.__ModuleLoader__.load({
     Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' })
 
     const React = require('react')
+    const { Button, Input, Checkbox, Tag } = require('@deepseek-ai/dsh-client-ui-primitives')
     const { useEffect, useState } = React
 
     const PI_NS = 'llm-pi-ai'
@@ -23,7 +24,7 @@ window.__ModuleLoader__.load({
     const SETTINGS_TAB_ID = 'cliproxyapi'
     const SETTINGS_LOCALE_NS = 'settings.cliProxyApi'
     const SETTINGS_SUMMARY_NS = 'llm-cliproxyapi'
-    const inject = ['slots', 'locale', 'remote', 'remote.llm', 'remote.credentials', 'configForms']
+    const inject = ['slots', 'locale', 'remote', 'remote.credentials', 'configForms']
 
     const copy = {
       en: {
@@ -57,6 +58,10 @@ window.__ModuleLoader__.load({
         needOneModel: 'Enable at least one available model. DSH cannot save an empty provider catalog.',
         selectionUnavailable: 'Model selection settings are unavailable or read-only.',
         partialSave: 'Saving did not finish. The model selection, API key or profile may already have changed; reload settings and retry.',
+        search: 'Search models by name or ID', selectedCount: 'selected of', selectAll: 'Select all loaded models', deselectAll: 'Deselect all loaded models',
+        noMatches: 'No models match your search.', enabled: 'Enable', details: 'Model details', rawDetails: 'All CPA fields',
+        context: 'Context window', output: 'Maximum output', modalities: 'Input modalities', sourceDefault: 'default', sourceCPA: 'CPA',
+        efforts: 'Reasoning efforts', defaultEffort: 'Default effort', description: 'Description', empty: 'Empty', effortUnknown: 'Reasoning efforts not reported',
       },
       zh: {
         tab: 'CLIProxyAPI',
@@ -89,27 +94,36 @@ window.__ModuleLoader__.load({
         needOneModel: '请至少启用一个可用模型。DSH 不支持保存空的供应商模型目录。',
         selectionUnavailable: '模型选择设置不可用或为只读。',
         partialSave: '保存未完成。模型选择、API Key 或配置可能已经更改；请重新加载设置后重试。',
+        search: '按名称或 ID 搜索模型', selectedCount: '已选 / 总数', selectAll: '全选已加载模型', deselectAll: '取消选择所有已加载模型',
+        noMatches: '没有匹配的模型。', enabled: '启用', details: '模型详情', rawDetails: '所有 CPA 字段',
+        context: '上下文窗口', output: '最大输出', modalities: '输入类型', sourceDefault: '默认值', sourceCPA: 'CPA',
+        efforts: '推理等级', defaultEffort: '默认等级', description: '描述', empty: '空', effortUnknown: '未提供推理等级',
       },
     }
 
     const styles = {
-      section: { boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '720px', padding: '24px 16px 40px', margin: '0 auto', color: 'var(--dsw-alias-label-primary)' },
+      section: { boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px', width: '100%', minWidth: 0, maxWidth: '720px', padding: '24px 16px 40px', margin: '0 auto', color: 'var(--dsw-alias-label-primary)' },
       heading: { display: 'flex', flexDirection: 'column', gap: '6px' },
       title: { margin: 0, fontSize: '16px', fontWeight: 600 },
       intro: { margin: 0, color: 'var(--dsw-alias-label-secondary)', fontSize: '13px', lineHeight: 1.5 },
-      form: { display: 'flex', flexDirection: 'column', gap: '16px' },
-      field: { display: 'flex', flexDirection: 'column', gap: '7px' },
+      form: { display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 },
+      field: { display: 'flex', flexDirection: 'column', gap: '7px', minWidth: 0 },
       label: { fontSize: '14px', fontWeight: 500 },
       labelRow: { display: 'flex', alignItems: 'center', gap: '8px' },
       credentialStatus: { color: 'var(--dsw-alias-label-secondary)', fontSize: '12px', fontWeight: 400 },
-      input: { boxSizing: 'border-box', width: '100%', minHeight: '38px', border: '1px solid var(--dsw-alias-border-primary)', borderRadius: '10px', background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-primary)', padding: '8px 12px', font: 'inherit' },
-      status: { margin: 0, color: 'var(--dsw-alias-label-secondary)', fontSize: '13px', lineHeight: 1.4 },
-      statusError: { margin: 0, color: 'var(--dsw-alias-status-danger)', fontSize: '13px', lineHeight: 1.4 },
-      actions: { display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '4px' },
-      button: { cursor: 'pointer', minHeight: '38px', border: '1px solid transparent', borderRadius: '10px', background: 'var(--dsw-alias-brand-primary)', color: 'var(--dsw-alias-label-inverse, #fff)', padding: '8px 14px', font: 'inherit', fontWeight: 600 },
-      buttonDisabled: { cursor: 'default', opacity: 0.75 },
-      modelList: { display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '360px', overflowY: 'auto' },
-      model: { display: 'flex', alignItems: 'flex-start', gap: '8px' },
+      status: { margin: 0, color: 'var(--dsw-alias-label-secondary)', fontSize: '13px', lineHeight: 1.5, overflowWrap: 'anywhere' },
+      statusError: { margin: 0, color: 'var(--dsw-alias-state-error-primary)', fontSize: '13px', lineHeight: 1.5, overflowWrap: 'anywhere' },
+      actions: { display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '8px', paddingTop: '4px' },
+      toolbar: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' },
+      modelList: { display: 'flex', flexDirection: 'column', minWidth: 0, maxHeight: 'min(560px, 65vh)', overflowY: 'auto', scrollbarGutter: 'stable', border: '0.5px solid var(--dsw-alias-border-l4)', borderRadius: '12px', padding: '0 12px' },
+      model: { display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0, padding: '12px 0', borderBottom: '0.5px solid var(--dsw-alias-border-l4)' },
+      modelHeader: { display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 12px', minWidth: 0 },
+      modelName: { minWidth: 0, fontSize: '14px', fontWeight: 600, overflowWrap: 'anywhere' },
+      details: { minWidth: 0, fontSize: '13px', lineHeight: 1.5, overflowWrap: 'anywhere' },
+      summary: { cursor: 'pointer', color: 'var(--dsw-alias-label-secondary)' },
+      metadata: { margin: '6px 0 0', paddingLeft: '16px', minWidth: 0, overflowWrap: 'anywhere' },
+      value: { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
+      efforts: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', minWidth: 0 },
     }
 
     function validBaseURL(value, messages) {
@@ -149,6 +163,7 @@ window.__ModuleLoader__.load({
           input: Array.isArray(model.inputModalities) && model.inputModalities.length
             ? [...model.inputModalities]
             : ['text'],
+          ...(model.reasoningEfforts ? { reasoningEfforts: { ...model.reasoningEfforts } } : {}),
         })),
         defaultContextWindow: previous.defaultContextWindow ?? 262144,
         defaultMaxTokens: previous.defaultMaxTokens ?? 32768,
@@ -225,15 +240,16 @@ window.__ModuleLoader__.load({
       }
     }
 
-    async function discoverModels(remote, baseURL, apiKey, messages) {
+    async function discoverModels(baseURL, apiKey, messages) {
       let discovery
       try {
-        discovery = await remote.llm.discoverModels(DISCOVERY_NS, {
-          provider: PROVIDER,
-          baseURL,
-          api: 'openai-responses',
-          ...(apiKey ? { apiKey } : {}),
+        const transportFetch = window.__DSH_TRANSPORT__?.fetch || globalThis.fetch
+        const response = await transportFetch('/api/cliproxyapi/catalog', {
+          method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', cache: 'no-store',
+          body: JSON.stringify({ baseURL, ...(apiKey ? { apiKey } : {}) }),
         })
+        if (!response.ok) throw new Error(messages.loadFailed)
+        discovery = await response.json()
       } catch {
         throw new Error(messages.loadFailed)
       }
@@ -246,7 +262,7 @@ window.__ModuleLoader__.load({
       const initialSnapshot = scope.getSnapshot()
       if (initialSnapshot?.status !== 'ready' || !initialSnapshot.writable || !Number.isInteger(initialSnapshot.revision)) throw new Error(messages.saveFailed)
       const originalProfile = initialSnapshot.value?.providers?.[PROVIDER]
-      const models = await discoverModels(remote, baseURL, apiKey, messages)
+      const models = await discoverModels(baseURL, apiKey, messages)
       const selectionSnapshot = selectionScope.getSnapshot()
       if (selectionSnapshot?.status !== 'ready' || !selectionSnapshot.writable) throw new Error(messages.selectionUnavailable)
       const selection = { ...(selectionSnapshot.value?.modelSelection || {}), ...draft }
@@ -294,6 +310,57 @@ window.__ModuleLoader__.load({
         throw error
       }
     }
+    function metadataValue(value, t) {
+      if (value !== null && typeof value === 'object') {
+        const entries = Object.entries(value)
+        if (!entries.length) return React.createElement('span', { style: styles.status }, t('empty'))
+        return React.createElement('ul', { style: styles.metadata }, entries.map(([key, child]) =>
+          React.createElement('li', { key },
+            child !== null && typeof child === 'object'
+              ? React.createElement('details', { style: styles.details }, React.createElement('summary', { style: styles.summary }, key), metadataValue(child, t))
+              : React.createElement('span', { style: styles.value }, key + ': ', String(child)),
+          ),
+        ))
+      }
+      return React.createElement('span', { style: styles.value }, String(value))
+    }
+
+    function modelEfforts(model, t) {
+      const raw = model.catalogMetadata || {}
+      const advertised = Array.isArray(raw.supported_reasoning_levels)
+        ? raw.supported_reasoning_levels.map((entry) => typeof entry === 'string' ? entry : entry?.effort).filter((value) => typeof value === 'string')
+        : Object.values(model.reasoningEfforts || {})
+      const efforts = [...new Set(advertised)]
+      return React.createElement('div', { style: styles.efforts },
+        React.createElement('span', { style: styles.status }, efforts.length ? t('efforts') + ':' : t('effortUnknown')),
+        efforts.map((effort) => React.createElement(Tag, { key: effort, tone: effort === raw.default_reasoning_level ? 'info' : 'neutral' }, effort)),
+        typeof raw.default_reasoning_level === 'string' ? React.createElement('span', { style: styles.status }, t('defaultEffort') + ': ' + raw.default_reasoning_level) : null,
+      )
+    }
+
+    function modelDetails(model, t) {
+      const raw = model.catalogMetadata && typeof model.catalogMetadata === 'object' ? model.catalogMetadata : {}
+      const source = (key) => model.catalogSources?.[key] === 'default' ? t('sourceDefault') : model.catalogSources?.[key] === 'cpa' ? t('sourceCPA') : ''
+      const line = (label, value, provenance) => value === undefined || value === null ? null : React.createElement('p', { style: styles.status }, label, ': ', String(value), provenance ? ' (' + provenance + ')' : '')
+      return React.createElement('details', { style: styles.details },
+        React.createElement('summary', { style: styles.summary }, t('details')),
+        line(t('context'), model.contextWindow?.toLocaleString(), source('contextWindow')),
+        line(t('output'), model.maxTokens?.toLocaleString(), source('maxTokens')),
+        line(t('modalities'), (model.inputModalities || model.input || []).join(', '), source('inputModalities')),
+        raw.description != null ? React.createElement('div', null, t('description'), ': ', metadataValue(raw.description, t)) : null,
+        raw.default_reasoning_level != null ? React.createElement('div', null, t('defaultEffort'), ': ', metadataValue(raw.default_reasoning_level, t)) : null,
+        Array.isArray(raw.supported_reasoning_levels) ? React.createElement('div', null,
+          t('efforts'),
+          React.createElement('ul', { style: styles.metadata }, raw.supported_reasoning_levels.map((entry, index) =>
+            React.createElement('li', { key: index, style: styles.value }, typeof entry === 'string' ? entry
+              : entry && typeof entry.effort === 'string' ? entry.effort + (typeof entry.description === 'string' ? ' — ' + entry.description : '')
+                : metadataValue(entry, t)),
+          )),
+        ) : model.reasoningEfforts ? React.createElement('div', null, t('efforts'), metadataValue(model.reasoningEfforts, t)) : null,
+        React.createElement('details', { style: styles.details }, React.createElement('summary', { style: styles.summary }, t('rawDetails')), metadataValue(raw, t)),
+      )
+    }
+
 
     function SettingsTab({ scope, selectionScope, remote, t, view, useScope, useSelectionScope }) {
       if (view === 'summary') return 'CLIProxyAPI model gateway'
@@ -307,6 +374,7 @@ window.__ModuleLoader__.load({
       const [feedback, setFeedback] = useState({ text: '', error: false })
       const [models, setModels] = useState(undefined)
       const [draft, setDraft] = useState({})
+      const [search, setSearch] = useState('')
       const [loadingModels, setLoadingModels] = useState(false)
       const requestGeneration = React.useRef(0)
       const readOnly = snapshot?.status === 'ready' && !snapshot.writable
@@ -339,11 +407,10 @@ window.__ModuleLoader__.load({
         try {
           const url = sourceURL.trim().replace(/\/+$/, '')
           validBaseURL(url, { baseRequired: t('baseRequired'), baseInvalid: t('baseInvalid') })
-          const result = await discoverModels(remote, url, sourceKey.trim(), { loadFailed: t('loadFailed'), noModels: t('noModels') })
+          const result = await discoverModels(url, sourceKey.trim(), { loadFailed: t('loadFailed'), noModels: t('noModels') })
           if (generation === requestGeneration.current) setModels(result)
         } catch (error) {
           if (generation === requestGeneration.current) {
-            setModels(undefined)
             setFeedback({ text: error instanceof Error ? error.message : t('loadFailed'), error: true })
           }
         } finally {
@@ -395,6 +462,11 @@ window.__ModuleLoader__.load({
           setSaving(false)
         }
       }
+      const isSelected = (model) => Object.prototype.hasOwnProperty.call(draft, model.id) ? draft[model.id] : selectionSnapshot?.value?.modelSelection?.[model.id] !== false
+      const selectedCount = models?.filter(isSelected).length || 0
+      const query = search.trim().toLowerCase()
+      const filtered = models?.filter((model) => (model.name || '').toLowerCase().includes(query) || model.id.toLowerCase().includes(query))
+      const selectLoaded = (checked) => setDraft((current) => ({ ...current, ...Object.fromEntries(models.map((model) => [model.id, checked])) }))
 
       return React.createElement(
         'div', { style: styles.section, 'aria-busy': saving || snapshot?.status === 'loading' },
@@ -410,7 +482,7 @@ window.__ModuleLoader__.load({
           React.createElement('p', { style: styles.status, role: 'note' }, t('imageCapability')),
           React.createElement('label', { style: styles.field },
             React.createElement('span', { style: styles.label }, t('baseURL')),
-            React.createElement('input', { style: styles.input, type: 'url', value: baseURL, autoComplete: 'url', disabled: !canSave, onChange: (event) => { invalidateModels(); setBaseURL(event.currentTarget.value) } }),
+            React.createElement(Input, { type: 'url', value: baseURL, autoComplete: 'url', disabled: !canSave, onChange: (event) => { invalidateModels(); setBaseURL(event.currentTarget.value) } }),
           ),
           React.createElement('label', { style: styles.field },
             React.createElement('span', { style: styles.labelRow },
@@ -418,28 +490,33 @@ window.__ModuleLoader__.load({
               credentialStatus === 'configured'
                 ? React.createElement('span', { style: styles.credentialStatus, role: 'status' }, t('credentialConfiguredLabel')) : null,
             ),
-            React.createElement('input', { style: styles.input, type: 'password', value: apiKey, placeholder: credentialStatus === 'configured' ? t('apiKeyConfiguredPlaceholder') : t('apiKeyPlaceholder'), autoComplete: 'off', disabled: !canSave, onChange: (event) => { invalidateModels(); setApiKey(event.currentTarget.value) } }),
+            React.createElement(Input, { type: 'password', value: apiKey, placeholder: credentialStatus === 'configured' ? t('apiKeyConfiguredPlaceholder') : t('apiKeyPlaceholder'), autoComplete: 'off', disabled: !canSave, onChange: (event) => { invalidateModels(); setApiKey(event.currentTarget.value) } }),
           ),
           !selectionReady ? React.createElement('p', { style: styles.status, role: 'status' }, t('selectionUnavailable')) : null,
           React.createElement('div', { style: styles.field },
             React.createElement('span', { style: styles.label }, t('models')),
             React.createElement('p', { style: styles.status, role: 'note' }, t('modelsHelp')),
             React.createElement('p', { style: styles.status, role: 'note' }, t('metadataHelp')),
-            models && models.every((model) => (Object.prototype.hasOwnProperty.call(draft, model.id) ? draft[model.id] : selectionSnapshot.value?.modelSelection?.[model.id] !== false) === false) && profile
-              ? React.createElement('p', { style: styles.statusError, role: 'alert' }, t('noEnabledRefresh')) : null,
-            React.createElement('button', { type: 'button', style: styles.button, disabled: !canSave, onClick: () => loadModels() }, loadingModels ? t('loadingModels') : t('loadModels')),
-            models ? React.createElement('div', { style: styles.modelList }, models.map((model) => {
-              const selected = Object.prototype.hasOwnProperty.call(draft, model.id) ? draft[model.id] : selectionSnapshot.value?.modelSelection?.[model.id] !== false
-              const metadata = [model.id, model.contextWindow && `context: ${model.contextWindow}`, model.maxTokens && `output: ${model.maxTokens}`, (model.inputModalities || []).join(', ')].filter(Boolean).join(' · ')
-              return React.createElement('label', { key: model.id, style: styles.model },
-                React.createElement('input', { type: 'checkbox', checked: selected, disabled: !canSave, onChange: (event) => { const checked = event.currentTarget.checked; setDraft((current) => ({ ...current, [model.id]: checked })) } }),
-                React.createElement('span', null, model.name || model.id, React.createElement('small', { style: { ...styles.status, display: 'block' } }, metadata)),
-              )
-            })) : null,
+            models && selectedCount === 0 && profile ? React.createElement('p', { style: styles.statusError, role: 'alert' }, t('noEnabledRefresh')) : null,
+            React.createElement('div', { style: styles.toolbar }, React.createElement(Button, { type: 'button', variant: 'outline', size: 'sm', disabled: !canSave, onClick: () => loadModels() }, loadingModels ? t('loadingModels') : t('loadModels'))),
+            models ? React.createElement(React.Fragment, null,
+              React.createElement('label', { style: styles.field }, React.createElement('span', { style: styles.label }, t('search')), React.createElement(Input, { type: 'search', value: search, onChange: (event) => setSearch(event.currentTarget.value) })),
+              React.createElement('div', { style: styles.toolbar },
+                React.createElement('span', { style: styles.status, role: 'status' }, selectedCount, ' ', t('selectedCount'), ' ', models.length),
+                React.createElement(Button, { type: 'button', variant: 'outline', size: 'sm', style: { maxWidth: '100%', height: 'auto', minHeight: '28px', whiteSpace: 'normal' }, disabled: !canSave, onClick: () => selectLoaded(true) }, t('selectAll')),
+                React.createElement(Button, { type: 'button', variant: 'outline', size: 'sm', style: { maxWidth: '100%', height: 'auto', minHeight: '28px', whiteSpace: 'normal' }, disabled: !canSave, onClick: () => selectLoaded(false) }, t('deselectAll')),
+              ),
+              filtered.length ? React.createElement('div', { style: styles.modelList, role: 'region', 'aria-label': t('models'), tabIndex: 0 }, filtered.map((model) => React.createElement('div', { key: model.id, style: styles.model },
+                React.createElement('div', { style: styles.modelHeader }, React.createElement('div', { style: styles.modelName }, React.createElement(Checkbox, { label: t('enabled') + ' ' + (model.name || model.id), checked: isSelected(model), disabled: !canSave, onChange: (checked) => setDraft((current) => ({ ...current, [model.id]: checked })) })), React.createElement('span', { style: styles.status }, model.id)),
+                React.createElement('p', { style: styles.status }, [model.contextWindow != null ? t('context') + ': ' + model.contextWindow.toLocaleString() + (model.catalogSources?.contextWindow === 'default' ? ' (' + t('sourceDefault') + ')' : '') : '', model.maxTokens != null ? t('output') + ': ' + model.maxTokens.toLocaleString() + (model.catalogSources?.maxTokens === 'default' ? ' (' + t('sourceDefault') + ')' : '') : '', (model.inputModalities || model.input || []).join(', ')].filter(Boolean).join(' · ')),
+                modelEfforts(model, t),
+                modelDetails(model, t),
+              ))) : React.createElement('p', { style: styles.status, role: 'status' }, t('noMatches')),
+            ) : null,
           ),
           feedback.text ? React.createElement('p', { style: feedback.error ? styles.statusError : styles.status, role: feedback.error ? 'alert' : 'status' }, feedback.text) : null,
           React.createElement('div', { style: styles.actions },
-            React.createElement('button', { type: 'submit', style: canSave ? styles.button : { ...styles.button, ...styles.buttonDisabled }, disabled: !canSave }, saving ? t('saving') : t('save')),
+            React.createElement(Button, { type: 'submit', variant: 'primary', size: 'md', disabled: !canSave }, saving ? t('saving') : t('save')),
           ),
         ),
       )

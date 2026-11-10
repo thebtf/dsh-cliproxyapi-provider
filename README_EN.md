@@ -11,7 +11,7 @@ The plugin automatically retrieves the model list from CLIProxyAPI, so models do
 Install the plugin:
 
 ```powershell
-npx @deepseek-ai/dsh plugin --profile web add 'github:thebtf/dsh-cliproxyapi-provider#v0.2.1'
+npx @deepseek-ai/dsh plugin --profile web add 'github:thebtf/dsh-cliproxyapi-provider#v0.3.0'
 ```
 
 Start or restart DeepSeek Harness Web:
@@ -28,6 +28,14 @@ After opening Harness:
 3. Enter the **API key**. Leave it empty if the service does not require authentication.
 4. Save the configuration. The model list will be retrieved automatically and refreshed periodically. Models whose catalog `input_modalities` includes `image` automatically receive image-input support. If CLIProxyAPI omits this field, image support is treated as unknown rather than guessed.
 
+### Choosing models
+
+Select **Load models**, search by name or ID, and use **Deselect all loaded models** to start with an empty draft before enabling the models you want. Bulk actions affect the entire loaded catalog, even while a search is active. Changes apply only after **Save & Enable**; at least one available model must remain enabled. Choices for models temporarily absent from CPA are retained. New model IDs are enabled by default.
+
+Each row shows effective context/output limits, input types and advertised reasoning efforts. Values supplied by plugin defaults are marked **default** rather than presented as CPA metadata. **Model details → All CPA fields** exposes every field returned for that model, including descriptions, default effort, nested capabilities and instructions. These extra fields are read-only and are not copied into the inference configuration. Supported reasoning efforts are also passed to DSH's model configuration.
+
+The moving GitHub channel is `github:thebtf/dsh-cliproxyapi-provider#latest`; version tags remain immutable. A GitHub-aware updater is required on DSH 0.2.2-rc.1, whose native Versions section only updates registry installations.
+
 Uninstall the plugin:
 
 ```powershell
@@ -38,4 +46,4 @@ Restart DeepSeek Harness Web after uninstalling the plugin.
 
 ## Compatibility
 
-This release targets DeepSeek Harness `0.2.2-rc.1`. It contributes a plugin configuration page through `plugins.item`, edits the `llm-pi-ai` entry with `configForms`, and uses `ctx.remote` for credentials and model discovery. The page appears only while the Host serves the `llm-pi-ai` configuration entry; model discovery uses the `llm-cliproxyapi` namespace. Restart the Web process after installing or upgrading so DSH loads the current client bundle.
+This release targets DeepSeek Harness `0.2.2-rc.1`. It contributes a plugin configuration page through `plugins.item`, edits the `llm-pi-ai` entry with `configForms`, and uses `ctx.remote` for credentials. Full catalog reads use an owner-authenticated Connection Fetch route at `/api/cliproxyapi/catalog`, with the shell transport for Desktop. The page appears only while the Host serves both configuration entries. Generic discovery remains available under `llm-cliproxyapi`; DSH's generic discovery API omits extended metadata. Restart the Web process or Desktop application after installing or upgrading so DSH loads the current client bundle.

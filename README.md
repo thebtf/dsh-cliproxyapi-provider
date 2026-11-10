@@ -11,7 +11,7 @@
 安装插件：
 
 ```powershell
-npx @deepseek-ai/dsh plugin --profile web add 'github:thebtf/dsh-cliproxyapi-provider#v0.2.1'
+npx @deepseek-ai/dsh plugin --profile web add 'github:thebtf/dsh-cliproxyapi-provider#v0.3.0'
 ```
 
 启动或重启 DeepSeek Harness Web：
@@ -28,6 +28,14 @@ npx @deepseek-ai/dsh web
 3. 填写 **API 密钥**；无鉴权服务可以留空。
 4. 保存配置，模型列表会自动获取并定期刷新；如果模型目录的 `input_modalities` 声明了 `image`，图片输入能力会自动应用到对应型号。若 CLIProxyAPI 未提供此字段，能力按未知处理，不会臆测为支持图片。
 
+### 选择模型
+
+点击 **加载模型**，按名称或 ID 搜索；可先取消选择所有已加载模型，再启用需要的型号。批量操作始终作用于整个已加载目录，不受搜索筛选影响。点击 **保存并启用** 后才应用更改，且必须保留至少一个可用型号。暂时从 CPA 目录消失的型号仍保留选择，新型号默认启用。
+
+每行显示实际上下文、输出上限、输入类型和推理等级。服务未提供而使用插件默认值时会标注“默认值”。**模型详情 → 所有 CPA 字段** 可查看该型号返回的全部字段，包括描述、默认推理等级、嵌套能力和指令。这些额外字段仅供查看，不会写入推理配置；支持的推理等级会传递到 DSH 模型配置。
+
+滚动 GitHub 通道为 `github:thebtf/dsh-cliproxyapi-provider#latest`，版本标签保持不变。DSH 0.2.2-rc.1 的原生 Versions 只更新 registry 安装，GitHub 安装需使用支持 GitHub 的更新器。
+
 卸载插件：
 
 ```powershell
@@ -38,4 +46,4 @@ npx @deepseek-ai/dsh plugin --profile web remove @router-for-me/dsh-cliproxyapi-
 
 ## 兼容性
 
-此版本面向 DeepSeek Harness `0.2.2-rc.1`。它通过 `plugins.item` 在侧边栏“插件”页面提供插件配置项，以 `configForms` 编辑 `llm-pi-ai` 实例配置，并通过 `ctx.remote` 管理凭据与远程模型发现。页面只在 Host 提供 `llm-pi-ai` 配置时显示；模型发现使用 `llm-cliproxyapi` 命名空间。安装或升级后请重启 Web 进程，使 DSH 载入新的客户端插件包。
+此版本面向 DeepSeek Harness `0.2.2-rc.1`。它通过 `plugins.item` 提供插件配置项，以 `configForms` 编辑 `llm-pi-ai` 实例配置，并通过 `ctx.remote` 管理凭据。完整目录通过仅限 owner 的 Connection Fetch 路由 `/api/cliproxyapi/catalog` 读取，Desktop 使用 shell transport。页面只在 Host 提供两个配置项时显示。通用模型发现仍使用 `llm-cliproxyapi` 命名空间，但 DSH 的通用 API 会省略扩展元数据。安装或升级后请完全重启 Web 进程或 Desktop 应用，以载入新插件包。
