@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "CLIProxyAPI",
+    "description": "Connect CLIProxyAPI models to DeepSeek Harness.",
+    "detail": "details/en.md"
+  }
+}
