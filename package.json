@@ -1,6 +1,6 @@
 {
   "name": "@router-for-me/dsh-cliproxyapi-provider",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "GUI-configurable CLIProxyAPI Responses provider for DeepSeek Harness",
   "type": "module",
   "main": "./src/index.js",
