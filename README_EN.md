@@ -11,7 +11,7 @@ The plugin automatically retrieves the model list from CLIProxyAPI, so models do
 Install the plugin:
 
 ```powershell
-npx @deepseek-ai/dsh plugin --profile web add 'github:thebtf/dsh-cliproxyapi-provider#v0.3.0'
+npx @deepseek-ai/dsh plugin --profile web add 'github:thebtf/dsh-cliproxyapi-provider#v0.3.1'
 ```
 
 Start or restart DeepSeek Harness Web:
@@ -47,3 +47,7 @@ Restart DeepSeek Harness Web after uninstalling the plugin.
 ## Compatibility
 
 This release targets DeepSeek Harness `0.2.2-rc.1`. It contributes a plugin configuration page through `plugins.item`, edits the `llm-pi-ai` entry with `configForms`, and uses `ctx.remote` for credentials. Full catalog reads use an owner-authenticated Connection Fetch route at `/api/cliproxyapi/catalog`, with the shell transport for Desktop. The page appears only while the Host serves both configuration entries. Generic discovery remains available under `llm-cliproxyapi`; DSH's generic discovery API omits extended metadata. Restart the Web process or Desktop application after installing or upgrading so DSH loads the current client bundle.
+
+### Tool schema compatibility
+
+The managed CPA route sets `compat.supportsStrictMode: true`. This advertises support for the `strict` field: ordinary DSH tools then send **`strict: false` explicitly**, rather than omitting the field and allowing upstream automatic strict-schema normalization. The tool list, descriptions and parameter schemas remain intact. This fixes a reproduced upstream `server_error` with a large mixed MCP tool catalog on Codex-backed models. Existing managed profiles receive the setting on startup or catalog refresh; fully restart DSH after updating.

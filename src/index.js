@@ -217,6 +217,7 @@ function refreshKeyOf(profile, config) {
     defaultMaxTokens: profile.defaultMaxTokens,
     defaultInput: profile.defaultInput,
     sync: profileSyncValue(profile),
+    supportsStrictMode: profile.compat?.supportsStrictMode,
     headers: sortedHeaders(catalogHeadersOf(profile.headers, config.headers)),
   })
 }
@@ -232,6 +233,8 @@ async function profileOf(profile, models, hasApiKey, config) {
     displayName: PROVIDER,
     api: 'openai-responses',
     baseURL: normalizedBaseURL(profile.baseURL),
+    // This enables pi-ai's explicit strict:false, avoiding upstream auto-strict.
+    compat: { ...profile.compat, supportsStrictMode: true },
     models,
     defaultContextWindow: profile.defaultContextWindow ?? config.defaultContextWindow,
     defaultMaxTokens: profile.defaultMaxTokens ?? config.defaultMaxTokens,

@@ -370,6 +370,7 @@ test('first profile synchronization restores capabilities stripped by the browse
       compat: { chatTemplateKwargs: {}, chatTemplateArgs: {} },
     })
     assert.deepEqual(profile.models[1].input, ['text'])
+    assert.equal(profile.compat.supportsStrictMode, true)
     await waitFor(() => harness.timeouts.some((row) => row.delay === 300000))
     const periodic = harness.timeouts.find((row) => row.delay === 300000)
     periodic.callback()
@@ -618,6 +619,7 @@ test('catalog requests honor timeout and failed refreshes use exponential backof
 test('real Cordis composition leaves llm-pi-ai as the sole directory owner', async () => {
   const previousFetch = globalThis.fetch
   let inferenceAuthorization
+  let inferencePayload
   let catalogFetches = 0
   const document = {
     'llm-pi-ai': {
@@ -677,6 +679,7 @@ test('real Cordis composition leaves llm-pi-ai as the sole directory owner', asy
     const headers = new Headers(input instanceof Request ? input.headers : undefined)
     for (const [key, value] of new Headers(init?.headers)) headers.set(key, value)
     inferenceAuthorization = headers.get('authorization')
+    inferencePayload = input instanceof Request ? await input.clone().json() : JSON.parse(init.body)
     return new Response(JSON.stringify({ error: { message: 'intentional test response' } }), {
       status: 503,
       headers: { 'content-type': 'application/json' },
@@ -742,16 +745,20 @@ test('real Cordis composition leaves llm-pi-ai as the sole directory owner', asy
     assert.deepEqual(models[1].input, ['text', 'image'])
     assert.deepEqual((await ctx.llm.resolveModelInfo('CLIProxyAPI', 'think')).inputModalities, ['text', 'image'])
 
+    const toolParameters = { type: 'object', properties: { path: { type: 'string' }, mode: { type: 'string' } }, required: ['path'], additionalProperties: false }
     const chunks = []
     for await (const chunk of ctx.llm.stream({
       provider: 'CLIProxyAPI',
       model: 'plain',
+      tools: [{ name: 'optional_parameter_probe', description: 'A tool with an optional parameter', parameters: toolParameters }],
       messages: [createUserMessage({
         content: [{ type: 'text', text: 'probe' }],
         source: { kind: 'user' },
       })],
     })) chunks.push(chunk)
     assert.equal(inferenceAuthorization, PLACEHOLDER_AUTHORIZATION)
+    assert.equal(inferencePayload.tools[0].strict, false)
+    assert.deepEqual(inferencePayload.tools[0].parameters, toolParameters)
     assert.equal(chunks.at(-1)?.type, 'finish')
     assert.notEqual(chunks.at(-1)?.reason?.failure?.code, 'MISSING_CREDENTIAL')
   } finally {
@@ -787,7 +794,7 @@ test('model selection survives catalog changes and settings updates without nest
     await waitFor(() => harness.mutations.length === 1)
     assert.deepEqual(harness.section.providers.CLIProxyAPI.models.map((model) => model.id), ['enabled'])
     assert.equal(harness.section.providers.CLIProxyAPI.headers['X-Custom'], 'kept')
-    assert.deepEqual(harness.section.providers.CLIProxyAPI.compat, { supportsStore: false, chatTemplateArgs: {}, chatTemplateKwargs: {} })
+    assert.deepEqual(harness.section.providers.CLIProxyAPI.compat, { supportsStore: false, supportsStrictMode: true, chatTemplateArgs: {}, chatTemplateKwargs: {} })
     assert.deepEqual(harness.section.providers.CLIProxyAPI.retryPolicy, {
       mode: 'always', backoff: { initialDelayMs: 500, maxDelayMs: 10000, jitterRatio: 0.1 },
     })

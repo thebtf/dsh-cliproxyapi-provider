@@ -213,7 +213,7 @@ test('saving uses the CLIProxyAPI discovery instead of the pi-ai generic listing
     assert.equal(scope.mutations[0].value.headers.Authorization, 'Bearer custom')
     assert.equal(scope.mutations[0].value.headers.authorization, undefined)
     assert.equal(scope.mutations[0].value.headers['X-Custom'], 'kept')
-    assert.deepEqual(scope.mutations[0].value.compat, { supportsStore: false })
+    assert.deepEqual(scope.mutations[0].value.compat, { supportsStore: false, supportsStrictMode: true })
     assert.equal(states[4].text, '')
     assert.equal(listeners.size, 1)
     scope.publish({
@@ -354,7 +354,7 @@ test('model form retains absent choices and rejects disabling every model', asyn
     assert.deepEqual(scope.mutations[0].value.headers['X-Custom'], 'kept')
     assert.equal(scope.mutations[0].value.headers.Authorization, undefined)
     assert.equal(scope.mutations[0].value.apiKeyEnv, 'DSH_CLIPROXY_API_KEY')
-    assert.deepEqual(scope.mutations[0].value.compat, { supportsStore: false })
+    assert.deepEqual(scope.mutations[0].value.compat, { supportsStore: false, supportsStrictMode: true })
     assert.deepEqual(scope.mutations[0].value.retryPolicy, { mode: 'always' })
     assert.equal(scope.mutations[0].value.modelOverrides, undefined)
     assert.equal(scope.mutations[0].value.defaultContextWindow, 9000)
@@ -475,7 +475,7 @@ for (const { changeURL, foreignEdit } of [{ changeURL: false }, { changeURL: tru
       assert.equal(profile.baseURL, nextURL)
       assert.deepEqual(profile.models.map((model) => model.id), ['two'])
       assert.equal(profile.headers['X-Custom'], 'kept')
-      assert.deepEqual(profile.compat, { supportsStore: false })
+      assert.deepEqual(profile.compat, { supportsStore: false, supportsStrictMode: true })
       assert.notEqual(states[4].text, 'saved')
       scope.snapshot = { ...scope.snapshot, revision: 3, value: { providers: { CLIProxyAPI: { ...profile, models: [{ id: 'one' }], headers: { 'X-Custom': 'kept' } } } } }
       for (const listener of listeners) listener()

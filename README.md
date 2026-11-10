@@ -11,7 +11,7 @@
 安装插件：
 
 ```powershell
-npx @deepseek-ai/dsh plugin --profile web add 'github:thebtf/dsh-cliproxyapi-provider#v0.3.0'
+npx @deepseek-ai/dsh plugin --profile web add 'github:thebtf/dsh-cliproxyapi-provider#v0.3.1'
 ```
 
 启动或重启 DeepSeek Harness Web：
@@ -47,3 +47,7 @@ npx @deepseek-ai/dsh plugin --profile web remove @router-for-me/dsh-cliproxyapi-
 ## 兼容性
 
 此版本面向 DeepSeek Harness `0.2.2-rc.1`。它通过 `plugins.item` 提供插件配置项，以 `configForms` 编辑 `llm-pi-ai` 实例配置，并通过 `ctx.remote` 管理凭据。完整目录通过仅限 owner 的 Connection Fetch 路由 `/api/cliproxyapi/catalog` 读取，Desktop 使用 shell transport。页面只在 Host 提供两个配置项时显示。通用模型发现仍使用 `llm-cliproxyapi` 命名空间，但 DSH 的通用 API 会省略扩展元数据。安装或升级后请完全重启 Web 进程或 Desktop 应用，以载入新插件包。
+
+### 工具 Schema 兼容性
+
+插件为 CPA 路由设置 `compat.supportsStrictMode: true`，表示支持发送 `strict` 字段。普通 DSH 工具因此会显式发送 **`strict: false`**，而不是省略字段并触发上游自动严格化。工具列表、描述和参数 Schema 均保持不变。此设置修复了在 Codex 模型和较大的混合 MCP 工具目录上复现的上游 `server_error`。已有配置会在启动或目录刷新时更新；升级后请完全重启 DSH。
