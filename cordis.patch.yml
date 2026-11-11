@@ -1,5 +1,5 @@
 # Install the CLIProxyAPI catalog discovery and browser settings integration.
-# The built-in llm-pi-ai plugin remains the sole owner of provider routes.
+# The existing pi-ai route remains in use until an explicit CPA cutover.
 - insert:
     - id: llm-cliproxyapi
-      name: '@router-for-me/dsh-cliproxyapi-provider'
+      name: "@router-for-me/dsh-cliproxyapi-provider"

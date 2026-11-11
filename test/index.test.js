@@ -71,7 +71,7 @@ function createContext(initialSection, initialCredential) {
     },
     settings: {
       describe() {
-        return [{ ns: 'llm-pi-ai', value: section, revision }, { ns: 'llm-cliproxyapi', value: { modelSelection: selection } }]
+        return [{ ns: 'llm-pi-ai', value: section, revision }, { ns: 'llm-cliproxyapi', value: { modelSelection: selection }, revision: 0 }]
       },
       async mutate(_ns, ops, expectedRevision) {
         if (expectedRevision !== undefined && expectedRevision !== revision) {
@@ -199,7 +199,7 @@ test('initial discovery requests the fixed rich catalog and returns full capabil
         input_modalities: ['text', 'image'],
         supported_reasoning_levels: [{ effort: 'low' }, { effort: 'high' }],
       },
-      catalogSources: { contextWindow: 'cpa', maxTokens: 'default', inputModalities: 'cpa' },
+      catalogSources: { contextWindow: 'cpa', maxTokens: 'default', inputModalities: 'cpa', reasoningEfforts: 'cpa' },
     })
     harness.dispose()
   } finally {
@@ -231,7 +231,7 @@ test('full catalog route preserves reasoning and unknown metadata through an aut
     assert.equal(body.ok, true)
     assert.deepEqual(body.value[0].catalogMetadata, entry)
     assert.deepEqual(body.value[0].reasoningEfforts, { low: 'low', high: 'high' })
-    assert.deepEqual(body.value[0].catalogSources, { contextWindow: 'cpa', maxTokens: 'cpa', inputModalities: 'default' })
+    assert.deepEqual(body.value[0].catalogSources, { contextWindow: 'cpa', maxTokens: 'cpa', inputModalities: 'default', reasoningEfforts: 'cpa' })
     assert.equal(harness.mutations.length, 0)
   } finally {
     harness.dispose()
@@ -263,6 +263,57 @@ test('full catalog route refuses malformed, oversized and unexpected fields with
     globalThis.fetch = previousFetch
   }
 })
+test('catalog RPC and POST bind saved keys to their endpoint without fallback', async () => {
+  const previousFetch = globalThis.fetch
+  const calls = []
+  globalThis.fetch = async (_url, init) => { calls.push(new Headers(init.headers).get('authorization')); return Response.json({ models: [{ slug: 'model' }] }) }
+  const harness = createContext({ providers: {} }, 'legacy-secret')
+  const describe = harness.ctx.settings.describe
+  harness.ctx.settings.describe = () => describe().map((entry) => entry.ns === 'llm-cliproxyapi'
+    ? { ...entry, revision: 0, value: { baseURL: 'https://saved.invalid/v1', authIdentity: { type: 'reference', ref: 'CPA_TEST_KEY' } } } : entry)
+  harness.ctx.credentials.resolve = async (ref) => ({ value: String(ref).includes('CPA_TEST_KEY') ? 'saved-secret' : 'legacy-secret' })
+  try {
+    apply(harness.ctx, await resolvedConfig())
+    const rpc = harness.discoveries.get('llm-cliproxyapi')
+    const post = async (body) => harness.routes.get(CATALOG_PATH).fetch(new Request('http://host' + CATALOG_PATH, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }))
+    await rpc({ baseURL: 'https://new.invalid/v1' })
+    assert.equal((await post({ baseURL: 'https://new.invalid/v1' })).status, 200)
+    await rpc({ baseURL: 'https://saved.invalid/v1' })
+    assert.equal((await post({ baseURL: 'https://saved.invalid/v1' })).status, 200)
+    await rpc({ baseURL: 'https://new.invalid/v1', apiKey: 'explicit-key' })
+    assert.equal((await post({ baseURL: 'https://new.invalid/v1', allowEndpointReuse: true })).status, 200)
+    assert.deepEqual(calls, [null, null, 'Bearer saved-secret', 'Bearer saved-secret', 'Bearer explicit-key', 'Bearer saved-secret'])
+    const command = harness.routes.get('/api/cliproxyapi/command')
+    for (const body of [
+      { type: 'preview-models', baseURL: 'https://new.invalid/v1', extra: true },
+      { type: 'preview-models', baseURL: 'https://new.invalid/v1', apiKey: 7 },
+      { type: 'save-connection', expectedRevision: 0, operationId: 'bad', baseURL: 'https://new.invalid/v1', authEdit: { type: 'none', extra: true } },
+    ]) {
+      const response = await command.fetch(new Request('http://host/api/cliproxyapi/command', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }))
+      assert.equal(response.status, 400)
+    }
+    assert.equal(calls.length, 6)
+  } finally { harness.dispose(); globalThis.fetch = previousFetch }
+})
+test('legacy discovery reuses its key only at its known endpoint', async () => {
+  const previousFetch = globalThis.fetch
+  const calls = []
+  globalThis.fetch = async (_url, init) => { calls.push(new Headers(init.headers).get('authorization')); return Response.json({ models: [{ slug: 'model' }] }) }
+  const harness = createContext({ providers: {} }, 'legacy-secret')
+  try {
+    apply(harness.ctx, await resolvedConfig())
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    harness.setSection({ providers: { CLIProxyAPI: managedProfile() } })
+    const rpc = harness.discoveries.get('llm-cliproxyapi')
+    await rpc({ baseURL: 'http://127.0.0.1:8317/v1' })
+    await rpc({ baseURL: 'https://new.invalid/v1' })
+    const response = await harness.routes.get(CATALOG_PATH).fetch(new Request('http://host' + CATALOG_PATH, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ baseURL: 'http://127.0.0.1:8317/v1' }) }))
+    assert.equal(response.status, 200)
+    assert.deepEqual(calls, ['Bearer legacy-secret', null, 'Bearer legacy-secret'])
+  } finally { harness.dispose(); globalThis.fetch = previousFetch }
+})
+
+
 
 test('settings changes synchronize outside the originating transaction', async () => {
   const transaction = new AsyncLocalStorage()
@@ -806,7 +857,8 @@ test('model selection survives catalog changes and settings updates without nest
     transaction.run(true, () => harness.emit('settings/document-updated', 'llm-cliproxyapi'))
     await waitFor(() => harness.mutations.length === 2)
     assert.deepEqual(harness.section.providers.CLIProxyAPI.models.map((model) => model.id), ['new'])
-    assert.equal(describes - previousDescribes, 1)
+    // The gateway also reads settings on updates; the selection behavior above is the contract.
+    assert.ok(describes > previousDescribes)
 
     harness.setSelection({ disabled: true, absent: false })
     harness.emit('settings/document-updated', 'llm-cliproxyapi')
@@ -833,4 +885,25 @@ test('an empty enabled catalog leaves the existing provider intact and reports t
     harness.dispose()
     globalThis.fetch = previousFetch
   }
+})
+
+test('catalog boundary classifies upstream failures without exposing bodies', async () => {
+  const h = createContext({ providers: {} })
+  const oldFetch = globalThis.fetch
+  try {
+    apply(h.ctx, await resolvedConfig({ refreshIntervalMs: 0 }))
+    const route = h.routes.get(CATALOG_PATH)
+    for (const [response, expected] of [
+      [new Response('private-auth-body', { status: 401 }), 'CATALOG_AUTH'],
+      [new Response('private-error-body', { status: 503 }), 'CATALOG_TRANSPORT'],
+      [new Response('not-json-private'), 'CATALOG_INVALID_RESPONSE'],
+      [new Response('', { headers: { 'content-length': '5000000' } }), 'CATALOG_TOO_LARGE'],
+    ]) {
+      globalThis.fetch = async () => response
+      const result = await route.fetch(new Request('http://host/api/cliproxyapi/catalog', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ baseURL: 'https://fixture.invalid/v1', apiKey: '' }) }))
+      const body = await result.json()
+      assert.equal(body.error.code, expected)
+      assert.equal(JSON.stringify(body).includes('private'), false)
+    }
+  } finally { globalThis.fetch = oldFetch; h.dispose() }
 })

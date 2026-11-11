@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "CLIProxyAPI",
-    "description": "Подключение моделей CLIProxyAPI к DeepSeek Harness.",
+    "description": "Подключение шлюза CLIProxyAPI и управление моделями в DeepSeek Harness.",
     "detail": "details/ru.md"
   }
 }

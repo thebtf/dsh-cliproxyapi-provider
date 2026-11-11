@@ -1,0 +1,1 @@
+export const credentialField = (name) => /^(?:(?:x[-_])?api[-_]?key|(?:[\w]+[-_])*authorization|cookie|set[-_]?cookie|password|secret|token|key|access[-_]?token|refresh[-_]?token|credential)$/i.test(name)

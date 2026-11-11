@@ -126,7 +126,7 @@ test('discovery preserves every CPA field without adding metadata to inference p
   assert.deepEqual(models, [modelProfileOf(entry)])
   assert.equal(models[0].catalogMetadata, undefined)
   assert.deepEqual(discovery[0].catalogMetadata, entry)
-  assert.deepEqual(discovery[0].catalogSources, { contextWindow: 'cpa', maxTokens: 'cpa', inputModalities: 'cpa' })
+  assert.deepEqual(discovery[0].catalogSources, { contextWindow: 'cpa', maxTokens: 'cpa', inputModalities: 'cpa', reasoningEfforts: 'cpa' })
   assert.deepEqual(discovery[0].reasoningEfforts, { low: 'low', xhigh: 'xhigh' })
   assert.deepEqual(discovery[0].inputModalities, ['text', 'image'])
   entry.extra_capability.formats.push('changed')
@@ -137,7 +137,38 @@ test('discovery identifies effective defaults rather than claiming they came fro
   const { discovery } = readCodexCatalogWithMetadata({ models: [{ slug: 'minimal', context_window: -1, max_tokens: '100', input_modalities: ['audio'] }] }, {
     defaultContextWindow: 262144, defaultMaxTokens: 32768, defaultInput: ['text'],
   })
-  assert.deepEqual(discovery[0].catalogSources, { contextWindow: 'default', maxTokens: 'default', inputModalities: 'default' })
+  assert.deepEqual(discovery[0].catalogSources, { contextWindow: 'default', maxTokens: 'default', inputModalities: 'default', reasoningEfforts: 'default' })
   assert.equal(discovery[0].contextWindow, 262144)
   assert.deepEqual(discovery[0].catalogMetadata.input_modalities, ['audio'])
+})
+
+test('discovery redacts direct secret fields without discarding ordinary metadata', () => {
+  const entry = { slug: 'fixture', api_key: 'fixture-secret', extra: { authorization: 'fixture-token', description: 'retained' } }
+  const { discovery } = readCodexCatalogWithMetadata({ models: [entry] })
+  assert.deepEqual(discovery[0].catalogMetadata, { slug: 'fixture', api_key: '[redacted]', extra: { authorization: '[redacted]', description: 'retained' } })
+  assert.equal(entry.api_key, 'fixture-secret')
+})
+
+test('explicit capability overrides win while preserving upstream metadata', () => {
+  const result = readCodexCatalogWithMetadata({ models: [{ slug: 'model', context_window: 1000, max_output_tokens: 200, input_modalities: ['text'], supported_reasoning_levels: ['low'] }] }, {
+    defaultContextWindow: 3000, defaultMaxTokens: 1000, defaultInput: ['text'],
+    overrides: { model: { contextWindow: 4000, maxTokens: 500, inputModalities: ['text', 'image'], reasoningEfforts: { high: 'high' } } },
+  }).discovery[0]
+  assert.equal(result.contextWindow, 4000)
+  assert.equal(result.maxTokens, 500)
+  assert.deepEqual(result.inputModalities, ['text', 'image'])
+  assert.deepEqual(result.reasoningEfforts, { high: 'high' })
+  assert.deepEqual(result.catalogSources, { contextWindow: 'override', maxTokens: 'override', inputModalities: 'override', reasoningEfforts: 'override' })
+  assert.equal(result.catalogMetadata.context_window, 1000)
+})
+
+test('legacy-derived model overrides reach the effective catalog', () => {
+  const { discovery } = readCodexCatalogWithMetadata({ models: [{ slug: 'legacy', max_context_window: 1000, supported_reasoning_levels: [{ effort: 'high' }] }] }, {
+    defaultContextWindow: 3000, defaultMaxTokens: 500, defaultInput: ['text'],
+    overrides: { legacy: { name: 'Legacy', contextWindow: 9000, inputModalities: ['text', 'image'], reasoningEfforts: false, compat: { supportsTemperature: false } } },
+  })
+  assert.equal(discovery[0].contextWindow, 9000)
+  assert.deepEqual(discovery[0].inputModalities, ['text', 'image'])
+  assert.equal(discovery[0].reasoningEfforts, undefined)
+  assert.deepEqual(discovery[0].compat, { supportsTemperature: false })
 })

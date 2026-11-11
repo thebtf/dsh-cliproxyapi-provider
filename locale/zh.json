@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "CLIProxyAPI",
-    "description": "将 CLIProxyAPI 模型连接到 DeepSeek Harness。",
+    "description": "在 DeepSeek Harness 中连接 CLIProxyAPI 网关并管理模型。",
     "detail": "details/zh.md"
   }
 }
