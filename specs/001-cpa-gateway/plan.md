@@ -10,7 +10,7 @@
 
 ## Technical Context
 
-**Language/Version**: JavaScript ES modules, Node.js >=22; базовый пакет 0.3.1.
+**Language/Version**: JavaScript ES modules, Node.js >=24.9.0 по фактическому engines опубликованного DSH 0.2.2-rc.1; базовый пакет 0.3.1, целевой minor-релиз 0.4.0.
 
 **Primary Dependencies**: публичные `@deepseek-ai/dsh-llm-pi-ai`, DSH Settings/Credentials/HomePaths и `@earendil-works/pi-ai`; прямые зависимости и lockfile, совместимый с DSH диапазон SDK, проверки нижней 1.3 и текущей 1.5.
 
@@ -18,7 +18,7 @@
 
 **Testing**: `node --test`, `npm run check`, contract/unit/integration; установленный пакет в изолированном DSH-профиле и один ограниченный реальный вызов CPA — отдельные доказательства, не выполненные сейчас.
 
-**Target Platform**: локальный DSH/desktop и его web settings; Node >=22.
+**Target Platform**: локальный DSH/desktop и его web settings; Node >=24.9.0. Обычные проверки выполняются в локальном Node24 Docker; поддерживаемые SDK 1.3/1.5 проверяются отдельно.
 
 **Project Type**: DSH-плагин с клиентской формой и host-командами.
 

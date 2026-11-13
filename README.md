@@ -6,7 +6,7 @@
 
 ## 安装与配置
 
-需要 Node.js 24.9.0 或更新版本和 DeepSeek Harness 0.2.2-rc.1：
+需要 Node.js 24.9.0 或更新版本和 DeepSeek Harness 0.2.2-rc.2（`engines.dsh` 允许 0.2.x 系列，核心小版本更新不会停用插件）：
 
 ```powershell
 npx @deepseek-ai/dsh plugin --profile web add 'github:thebtf/dsh-cliproxyapi-provider#v0.4.0'
@@ -28,4 +28,4 @@ npx @deepseek-ai/dsh web
 
 Models 页底部显示 CPA 状态和 **打开插件**。点击后再选择 **CLIProxyAPI** 进入设置。这不是 Models 主列表中的完整自主管理行；其中原生编辑／删除操作不是 CPA 生命周期操作。
 
-`latest` 通道需要支持 GitHub 的更新器；DSH 0.2.2-rc.1 的原生 Versions 只更新 registry 安装。这里不表示发布到 npm。卸载命令：`npx @deepseek-ai/dsh plugin --profile web remove @router-for-me/dsh-cliproxyapi-provider`，然后重启；卸载不承诺删除已保存配置。
+`latest` 通道需要支持 GitHub 的更新器；DSH 0.2.2-rc.2 的原生 Versions 只更新 registry 安装。这里不表示发布到 npm。卸载命令：`npx @deepseek-ai/dsh plugin --profile web remove @router-for-me/dsh-cliproxyapi-provider`，然后重启；卸载不承诺删除已保存配置。

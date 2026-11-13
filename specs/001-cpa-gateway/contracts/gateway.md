@@ -27,4 +27,16 @@
 
 ## Models
 
-`settings.models.footer` добавляет безопасный CPA status и переход к Plugins → CPA. `settings.models.provider-card` — extras, не замена штатных Edit/Delete. Полная owner-controlled строка, фальшивый profile, перехват DOM и подмена экрана не входят в контракт.
+`settings.models.footer` добавляет безопасный CPA status и кнопку «Открыть плагины». Проверенный публичный pluginNavigation предоставляет openList/openBundle, но не прямое открытие settings item: footer вызывает openList и явно предлагает выбрать CLIProxyAPI; затем штатный пункт открывает настройки. Не обещать one-click deep-link. `settings.models.provider-card` — extras, не замена штатных Edit/Delete. Полная owner-controlled строка, фальшивый profile, перехват DOM и подмена экрана не входят в контракт.
+
+## Зафиксированная JSON-форма для Host и клиента
+
+Дискриминатор команды — `type`; дискриминатор authEdit и сохранённой authIdentity — `type`. `authEdit` принимает `{type:'keep', allowEndpointReuse?:boolean}`, `{type:'replace', key:string}`, `{type:'reference', ref:string, allowEndpointReuse?:boolean}` либо `{type:'none'}`. Замена и reference — явные действия; пустое поле ключа не означает none. Корневая регрессия T002 использует эту форму.
+
+GET state и успешная команда возвращают `{ok:true,value:StateView}`. Preview и переходный POST catalog возвращают `{ok:true,value:ModelView[]}` и не меняют active state. Ошибка возвращает `{ok:false,error:{code,message,details:{...}}}` с соответствующим HTTP status, без raw upstream body/stack/credentials.
+
+`StateView`: `revision:number`, `generation?:string`, `operationId?:string`, `configured:boolean`, `enabled:boolean`, `baseURL:string|null`, `authMode:'record'|'reference'|'none'|null`, `keyConfigured:boolean`, `keyWritable:boolean`, `modelSelection:Record<string,boolean>`, `policy:object`, `models:ModelView[]`, `status:'not-configured'|'disabled'|'missing-credential'|'catalog-loading'|'ready'|'stale'|'reconfiguring'|'no-models'|'error'`, `catalog:{freshness:'empty'|'loading'|'fresh'|'stale',fetchedAt?:number,error?:{code,message}}`, `diagnostics:SafeDiagnostic[]`, `activationError?:{code,message}`, `legacy?:{available:boolean,baseURL?:string,revision?:number,fingerprint?:string,reason?:string}`. В legacy и policy нет значений секретов. `configured` не равно ready.
+
+`ModelView` сохраняет нынешний rich catalog format: `id`, `name`, `contextWindow`, `maxTokens`, `inputModalities`, optional `reasoningEfforts`, `defaultReasoningEffort`, `catalogSources` и `catalogMetadata` (все безопасные неизвестные поля CPA). Существующий renderer metadata остаётся применим. `preview-models` принимает `baseURL`, optional явно введённый `apiKey` и `allowEndpointReuse`; без key используется saved identity только для точного saved endpoint либо при явном reuse. `save-selection` принимает `selectionChanges`; `refresh-models` допускает только актуальный `connectionGeneration`.
+
+`set-enabled` принимает `enabled`; явный forget-key — `forget-key` с expectedRevision и operationId, переводит требующий key режим в missing-credential, а не none. `import-legacy` принимает expectedRevision, expectedLegacyRevision и fingerprint. Записывающие команды несут expectedRevision и operationId; no-op set-enabled сохраняет идемпотентность. Сначала публикуется полное состояние, затем возвращается readback; activationError не скрывает подтверждённую запись.

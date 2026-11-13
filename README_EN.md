@@ -6,7 +6,7 @@ The plugin connects one CLIProxyAPI gateway to DeepSeek Harness using the OpenAI
 
 ## Install and configure
 
-Requires Node.js 24.9.0 or newer and DeepSeek Harness 0.2.2-rc.1. Install the version tag or use the moving GitHub channel:
+Requires Node.js 24.9.0 or newer and DeepSeek Harness 0.2.2-rc.2 (`engines.dsh` accepts the 0.2.x line, so a minor core update does not disable the plugin): Install the version tag or use the moving GitHub channel:
 
 ```powershell
 npx @deepseek-ai/dsh plugin --profile web add 'github:thebtf/dsh-cliproxyapi-provider#v0.4.0'
@@ -28,4 +28,4 @@ An existing generic CLIProxyAPI profile continues to own its route until an expl
 
 The Models footer shows CPA status and **Open Plugins**. Open Plugins, then select **CLIProxyAPI** to reach its settings. This is not a complete owner-controlled row in the main Models provider list; native Edit/Delete there are not CPA lifecycle actions.
 
-The `latest` channel requires a GitHub-aware updater; the DSH 0.2.2-rc.1 native Versions UI updates registry installations only. No npm publication is implied. Uninstall with `npx @deepseek-ai/dsh plugin --profile web remove @router-for-me/dsh-cliproxyapi-provider` and restart; uninstall does not promise deletion of saved configuration.
+The `latest` channel requires a GitHub-aware updater; the DSH 0.2.2-rc.2 native Versions UI updates registry installations only. No npm publication is implied. Uninstall with `npx @deepseek-ai/dsh plugin --profile web remove @router-for-me/dsh-cliproxyapi-provider` and restart; uninstall does not promise deletion of saved configuration.
