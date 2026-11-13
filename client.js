@@ -6,7 +6,7 @@ window.__ModuleLoader__.load({
     Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' })
 
     const React = require('react')
-    const { Button, Input, Checkbox, Tag } = require('@deepseek-ai/dsh-client-ui-primitives')
+    const { Button, Input, Checkbox, Tag, StateDot } = require('@deepseek-ai/dsh-client-ui-primitives')
     const { useEffect, useState } = React
 
     const DISCOVERY_NS = 'llm-cliproxyapi'
@@ -25,6 +25,8 @@ window.__ModuleLoader__.load({
         loading: 'Loading CLIProxyAPI settings…',
         unavailable: 'CLIProxyAPI settings are unavailable in this Web profile.',
         readOnly: 'Settings are read-only for this connection.',
+        connection: 'Connection',
+        actions: 'Actions',
         baseURL: 'Base URL',
         apiKey: 'API key',
         apiKeyPlaceholder: 'Optional for a keyless CLIProxyAPI server',
@@ -61,6 +63,8 @@ window.__ModuleLoader__.load({
         loading: '正在读取 CLIProxyAPI 设置…',
         unavailable: '当前 Web 配置中无法访问 CLIProxyAPI 设置。',
         readOnly: '当前连接的设置为只读。',
+        connection: '连接',
+        actions: '操作',
         baseURL: 'Base URL',
         apiKey: 'API Key',
         apiKeyPlaceholder: '无鉴权的 CLIProxyAPI 可留空',
@@ -92,7 +96,7 @@ window.__ModuleLoader__.load({
     }
     Object.assign(copy.en, { save: 'Save', saved: 'Changes saved.', statusNotConfigured: 'Not configured.', statusDisabled: 'Connection disabled.', statusMissingKey: 'Credential is missing.', statusLoading: 'Loading catalog…', statusReady: 'Ready.', statusStale: 'Catalog is stale.', statusReconfiguring: 'Reconfiguring…', statusNoModels: 'No selected usable models; the connection is not ready.', statusError: 'Connection error.', activationFailed: 'Saved, but activation failed. The connection is not ready.', catalogError: 'Catalog refresh failed; the last good catalog may be stale.', uncertain: 'The result is unknown. Your draft is preserved; check the operation before trying again.', conflict: 'Settings changed elsewhere. Your draft is preserved; review it before saving again.', operationId: 'Operation ID', reconcile: 'Check operation', authAction: 'Authentication action', authkeep: 'Keep current identity', authreplace: 'Replace with a key', authreference: 'Use a credential reference', authnone: 'No authentication', reference: 'Credential reference', keyRequired: 'Enter a key.', referenceRequired: 'Enter a credential reference.', reuseConsent: 'Allow the saved identity to be used with this endpoint', reuseRequired: 'Explicitly allow credential reuse before previewing this endpoint.', httpWarning: 'HTTP is not encrypted; credentials and requests can be exposed.', policy: 'Connection policy (JSON object)', policyInvalid: 'Enter a valid policy JSON object.', refresh: 'Refresh saved catalog', saveSelection: 'Save model selection only', disconnect: 'Disable connection', enableConnection: 'Enable connection', disconnectHelp: 'Disabling preserves the endpoint, key and model selection; existing sessions may fail until re-enabled.', forgetKey: 'Forget key', forgetHelp: 'Forgetting the key can make the connection unavailable; it does not select keyless authentication.', importLegacy: 'Import legacy connection', openSettings: 'Open Plugins, then select CLIProxyAPI', sourceOverride: 'override' })
     Object.assign(copy.zh, { save: '保存', saved: '更改已保存。', statusNotConfigured: '尚未配置。', statusDisabled: '连接已停用。', statusMissingKey: '缺少凭据。', statusLoading: '正在加载目录…', statusReady: '已就绪。', statusStale: '目录已过期。', statusReconfiguring: '正在重新配置…', statusNoModels: '没有已选可用模型；连接尚未就绪。', statusError: '连接错误。', activationFailed: '已保存，但激活失败。连接尚未就绪。', catalogError: '目录刷新失败；上次成功的目录可能已过期。', uncertain: '结果未知。草稿已保留；重试前请检查操作。', conflict: '设置已在其他位置更改。草稿已保留；保存前请检查。', operationId: '操作 ID', reconcile: '检查操作', authAction: '身份验证操作', authkeep: '保留当前身份', authreplace: '替换为密钥', authreference: '使用凭据引用', authnone: '不使用身份验证', reference: '凭据引用', keyRequired: '请输入密钥。', referenceRequired: '请输入凭据引用。', reuseConsent: '允许在此地址使用已保存的身份', reuseRequired: '预览此地址前请明确允许重用凭据。', httpWarning: 'HTTP 未加密，凭据和请求可能泄露。', policy: '连接策略（JSON 对象）', policyInvalid: '请输入有效的策略 JSON 对象。', refresh: '刷新已保存的目录', saveSelection: '仅保存模型选择', disconnect: '停用连接', enableConnection: '启用连接', disconnectHelp: '停用会保留地址、密钥和模型选择；重新启用前现有会话可能失败。', forgetKey: '忘记密钥', forgetHelp: '忘记密钥可能导致连接不可用；不会自动选择无验证模式。', importLegacy: '导入旧连接', openSettings: '打开插件，然后选择 CLIProxyAPI', sourceOverride: '用户覆盖' })
-    copy.ru = { title: 'CLIProxyAPI', intro: 'Подключение сервера CLIProxyAPI и выбор моделей.', loading: 'Загрузка настроек…', unavailable: 'Настройки недоступны.', readOnly: 'Настройки доступны только для чтения.', baseURL: 'Адрес сервера', apiKey: 'Ключ API', baseRequired: 'Укажите адрес.', baseInvalid: 'Укажите корректный HTTP или HTTPS адрес.', save: 'Сохранить', saved: 'Изменения сохранены.', loadModels: 'Предпросмотр моделей', loadFailed: 'Не удалось загрузить каталог.', modelsHelp: 'Отключённые модели недоступны в DSH; существующие сессии могут завершиться ошибкой. Прямые вызовы CPA не блокируются. Новые модели включены по умолчанию.', search: 'Поиск по имени или ID', selectedCount: 'выбрано из', selectAll: 'Выбрать все модели', deselectAll: 'Снять выбор со всех', noMatches: 'Модели не найдены.', enabled: 'Включить', details: 'Сведения о модели', rawDetails: 'Все поля CPA', context: 'Контекст', output: 'Максимальный вывод', modalities: 'Типы входа', sourceDefault: 'по умолчанию', sourceCPA: 'CPA', sourceOverride: 'переопределение', efforts: 'Уровни рассуждения', defaultEffort: 'Уровень по умолчанию', description: 'Описание', empty: 'Пусто', effortUnknown: 'Уровни рассуждения не указаны', statusNotConfigured: 'Не настроено.', statusDisabled: 'Подключение отключено.', statusMissingKey: 'Нет учётных данных.', statusLoading: 'Загрузка каталога…', statusReady: 'Готово.', statusStale: 'Каталог устарел.', statusReconfiguring: 'Применение настроек…', statusNoModels: 'Нет выбранных доступных моделей; подключение не готово.', statusError: 'Ошибка подключения.', activationFailed: 'Сохранено, но активация не удалась. Подключение не готово.', catalogError: 'Обновить каталог не удалось; предыдущая копия может устареть.', uncertain: 'Результат неизвестен. Черновик сохранён; проверьте операцию перед повтором.', conflict: 'Настройки изменены в другом месте. Черновик сохранён; проверьте его.', operationId: 'ID операции', reconcile: 'Проверить операцию', authAction: 'Авторизация', authkeep: 'Оставить текущие данные', authreplace: 'Заменить ключ', authreference: 'Использовать ссылку на данные', authnone: 'Без авторизации', reference: 'Ссылка на учётные данные', keyRequired: 'Укажите ключ.', referenceRequired: 'Укажите ссылку.', reuseConsent: 'Разрешить использовать сохранённые данные с этим адресом', reuseRequired: 'Для предпросмотра явно разрешите повторное использование данных.', httpWarning: 'HTTP не шифруется: ключ и запросы могут быть раскрыты.', policy: 'Политика подключения (объект JSON)', policyInvalid: 'Укажите корректный объект JSON.', refresh: 'Обновить сохранённый каталог', saveSelection: 'Сохранить только выбор моделей', disconnect: 'Отключить подключение', enableConnection: 'Включить подключение', disconnectHelp: 'Отключение сохраняет адрес, ключ и выбор моделей; существующие сессии могут перестать работать.', forgetKey: 'Забыть ключ', forgetHelp: 'Удаление ключа может сделать подключение недоступным и не включает режим без авторизации.', importLegacy: 'Импортировать прежнее подключение', openSettings: 'Открыть Plugins и выбрать CLIProxyAPI' }
+    copy.ru = { title: 'CLIProxyAPI', intro: 'Подключение сервера CLIProxyAPI и выбор моделей.', connection: 'Подключение', actions: 'Действия', loading: 'Загрузка настроек…', unavailable: 'Настройки недоступны.', readOnly: 'Настройки доступны только для чтения.', baseURL: 'Адрес сервера', apiKey: 'Ключ API', baseRequired: 'Укажите адрес.', baseInvalid: 'Укажите корректный HTTP или HTTPS адрес.', save: 'Сохранить', saved: 'Изменения сохранены.', loadModels: 'Предпросмотр моделей', loadFailed: 'Не удалось загрузить каталог.', modelsHelp: 'Отключённые модели недоступны в DSH; существующие сессии могут завершиться ошибкой. Прямые вызовы CPA не блокируются. Новые модели включены по умолчанию.', search: 'Поиск по имени или ID', selectedCount: 'выбрано из', selectAll: 'Выбрать все модели', deselectAll: 'Снять выбор со всех', noMatches: 'Модели не найдены.', enabled: 'Включить', details: 'Сведения о модели', rawDetails: 'Все поля CPA', context: 'Контекст', output: 'Максимальный вывод', modalities: 'Типы входа', sourceDefault: 'по умолчанию', sourceCPA: 'CPA', sourceOverride: 'переопределение', efforts: 'Уровни рассуждения', defaultEffort: 'Уровень по умолчанию', description: 'Описание', empty: 'Пусто', effortUnknown: 'Уровни рассуждения не указаны', statusNotConfigured: 'Не настроено.', statusDisabled: 'Подключение отключено.', statusMissingKey: 'Нет учётных данных.', statusLoading: 'Загрузка каталога…', statusReady: 'Готово.', statusStale: 'Каталог устарел.', statusReconfiguring: 'Применение настроек…', statusNoModels: 'Нет выбранных доступных моделей; подключение не готово.', statusError: 'Ошибка подключения.', activationFailed: 'Сохранено, но активация не удалась. Подключение не готово.', catalogError: 'Обновить каталог не удалось; предыдущая копия может устареть.', uncertain: 'Результат неизвестен. Черновик сохранён; проверьте операцию перед повтором.', conflict: 'Настройки изменены в другом месте. Черновик сохранён; проверьте его.', operationId: 'ID операции', reconcile: 'Проверить операцию', authAction: 'Авторизация', authkeep: 'Оставить текущие данные', authreplace: 'Заменить ключ', authreference: 'Использовать ссылку на данные', authnone: 'Без авторизации', reference: 'Ссылка на учётные данные', keyRequired: 'Укажите ключ.', referenceRequired: 'Укажите ссылку.', reuseConsent: 'Разрешить использовать сохранённые данные с этим адресом', reuseRequired: 'Для предпросмотра явно разрешите повторное использование данных.', httpWarning: 'HTTP не шифруется: ключ и запросы могут быть раскрыты.', policy: 'Политика подключения (объект JSON)', policyInvalid: 'Укажите корректный объект JSON.', refresh: 'Обновить сохранённый каталог', saveSelection: 'Сохранить только выбор моделей', disconnect: 'Отключить подключение', enableConnection: 'Включить подключение', disconnectHelp: 'Отключение сохраняет адрес, ключ и выбор моделей; существующие сессии могут перестать работать.', forgetKey: 'Забыть ключ', forgetHelp: 'Удаление ключа может сделать подключение недоступным и не включает режим без авторизации.', importLegacy: 'Импортировать прежнее подключение', openSettings: 'Открыть Plugins и выбрать CLIProxyAPI', tab: 'CLIProxyAPI', imageCapability: 'Ввод изображений включается автоматически для моделей, которые заявляют поддержку изображений.', apiKeyPlaceholder: 'Необязательно для сервера CLIProxyAPI без ключа', apiKeyConfiguredPlaceholder: 'Ключ API уже сохранён', credentialConfiguredLabel: 'Настроено', saving: 'Сохранение…', syncTimeout: 'Профиль сохранён, но возможности изображений и рассуждений не синхронизированы. Проверьте журналы обновления провайдера и повторите попытку.', noModels: 'CLIProxyAPI не вернул доступных моделей.', models: 'Доступные модели', loadingModels: 'Загрузка моделей…', metadataHelp: 'Контекст, лимиты вывода и типы входа — действующие настройки; если сервер их не сообщает, могут использоваться значения по умолчанию.', noEnabledRefresh: 'В текущем каталоге нет включённых моделей. Прежний список провайдера остаётся активным, пока вы не включите модель и не сохраните.', needOneModel: 'Включите хотя бы одну доступную модель. DSH не может сохранить пустой каталог провайдера.', selectionUnavailable: 'Настройки выбора моделей недоступны или только для чтения.', partialSave: 'Сохранение не завершено. Выбор моделей, ключ или профиль могли измениться; перезагрузите настройки и повторите.' }
     Object.assign(copy.en, { openSettings: 'Open Plugins', chooseCPA: 'Then select CLIProxyAPI.', saveFailed: 'The operation was refused. Your draft is preserved.', revision: 'Readback revision' })
     Object.assign(copy.ru, { openSettings: 'Открыть плагины', chooseCPA: 'Затем выберите CLIProxyAPI.', saveFailed: 'Операция отклонена. Черновик сохранён.', revision: 'Прочитанная версия' })
     Object.assign(copy.zh, { openSettings: '打开插件', chooseCPA: '然后选择 CLIProxyAPI。', saveFailed: '操作被拒绝，草稿已保留。', revision: '读取的版本' })
@@ -103,30 +107,56 @@ window.__ModuleLoader__.load({
     Object.assign(copy.ru, { retryOperation: 'Повторить ту же операцию', returnToEdit: 'Вернуться к редактированию', conflictPending: 'Подтвердить результат нельзя: настройки изменились. Вернитесь к редактированию и проверьте черновик перед сохранением.', diagnosticHttp: 'Ответ HTTP', diagnosticPayload: 'Данные запроса', diagnosticBeforeHttp: 'До ответа HTTP', diagnosticTimeout: 'Время ожидания истекло', diagnosticAbort: 'Отменено', diagnosticSseCompleted: 'Поток завершён', diagnosticSseFailed: 'Ошибка потока', diagnosticSseIncomplete: 'Поток не завершён', diagnosticStatus: 'Статус HTTP', diagnosticRequestId: 'ID запроса', diagnosticAt: 'Время', diagnosticToolCount: 'Число инструментов', catalogAuth: 'Ошибка авторизации каталога. Проверьте учётные данные.', catalogTimeout: 'Время ожидания каталога истекло.', catalogTransport: 'Не удалось подключиться к каталогу.', catalogInvalidResponse: 'Некорректный ответ каталога.', catalogTooLarge: 'Ответ каталога слишком велик.' })
     Object.assign(copy.zh, { retryOperation: '重试同一操作', returnToEdit: '返回编辑', conflictPending: '设置已更改，无法确认结果。请返回编辑并在保存前检查草稿。', diagnosticHttp: 'HTTP 响应', diagnosticPayload: '请求载荷', diagnosticBeforeHttp: 'HTTP 响应前', diagnosticTimeout: '超时', diagnosticAbort: '已取消', diagnosticSseCompleted: '流已完成', diagnosticSseFailed: '流失败', diagnosticSseIncomplete: '流未完成', diagnosticStatus: 'HTTP 状态', diagnosticRequestId: '请求 ID', diagnosticAt: '时间', diagnosticToolCount: '工具数量', catalogAuth: '目录身份验证失败，请检查凭据。', catalogTimeout: '目录请求超时。', catalogTransport: '无法连接目录地址。', catalogInvalidResponse: '目录响应无效。', catalogTooLarge: '目录响应过大。' })
 
-    const styles = {
-      section: { boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px', width: '100%', minWidth: 0, maxWidth: '720px', padding: '24px 16px 40px', margin: '0 auto', color: 'var(--dsw-alias-label-primary)' },
-      heading: { display: 'flex', flexDirection: 'column', gap: '6px' },
-      title: { margin: 0, fontSize: '16px', fontWeight: 600 },
-      intro: { margin: 0, color: 'var(--dsw-alias-label-secondary)', fontSize: '13px', lineHeight: 1.5 },
-      form: { display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 },
-      field: { display: 'flex', flexDirection: 'column', gap: '7px', minWidth: 0 },
-      label: { fontSize: '14px', fontWeight: 500 },
-      labelRow: { display: 'flex', alignItems: 'center', gap: '8px' },
-      credentialStatus: { color: 'var(--dsw-alias-label-secondary)', fontSize: '12px', fontWeight: 400 },
-      status: { margin: 0, color: 'var(--dsw-alias-label-secondary)', fontSize: '13px', lineHeight: 1.5, overflowWrap: 'anywhere' },
-      statusError: { margin: 0, color: 'var(--dsw-alias-state-error-primary)', fontSize: '13px', lineHeight: 1.5, overflowWrap: 'anywhere' },
-      actions: { display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '8px', paddingTop: '4px' },
-      toolbar: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' },
-      modelList: { display: 'flex', flexDirection: 'column', minWidth: 0, maxHeight: 'min(560px, 65vh)', overflowY: 'auto', scrollbarGutter: 'stable', border: '0.5px solid var(--dsw-alias-border-l4)', borderRadius: '12px', padding: '0 12px' },
-      model: { display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0, padding: '12px 0', borderBottom: '0.5px solid var(--dsw-alias-border-l4)' },
-      modelHeader: { display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 12px', minWidth: 0 },
-      modelName: { minWidth: 0, fontSize: '14px', fontWeight: 600, overflowWrap: 'anywhere' },
-      details: { minWidth: 0, fontSize: '13px', lineHeight: 1.5, overflowWrap: 'anywhere' },
-      summary: { cursor: 'pointer', color: 'var(--dsw-alias-label-secondary)' },
-      metadata: { margin: '6px 0 0', paddingLeft: '16px', minWidth: 0, overflowWrap: 'anywhere' },
-      value: { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
-      efforts: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', minWidth: 0 },
-    }
+    // The page body sits inside the Host's plugin page, which already draws the
+    // title, the one-liner and the 960px column. This sheet only styles what the
+    // Host does not: the sections, the fields and the model list. Every colour is
+    // a Host theme token, so light and dark follow the app without a second copy.
+    const SETTINGS_CSS = `
+.cpa-page { display:flex; flex-direction:column; gap:28px; min-width:0; color:var(--dsw-alias-label-primary); font:inherit; }
+.cpa-section { display:flex; flex-direction:column; gap:12px; min-width:0; }
+.cpa-section-title { margin:0; font-size:14px; line-height:20px; font-weight:500; }
+.cpa-status { display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0; }
+.cpa-status-text { margin:0; font-size:13px; line-height:20px; color:var(--dsw-alias-label-secondary); overflow-wrap:anywhere; }
+.cpa-status-text[data-tone='error'] { color:var(--dsw-alias-state-error-primary); }
+.cpa-note { margin:0; font-size:12px; line-height:18px; color:var(--dsw-alias-label-tertiary); overflow-wrap:anywhere; }
+.cpa-note[data-tone='warn'] { color:var(--dsw-alias-state-warn-primary); }
+.cpa-note[data-tone='error'] { color:var(--dsw-alias-state-error-primary); }
+.cpa-form { display:flex; flex-direction:column; gap:28px; min-width:0; }
+.cpa-field { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.cpa-label { font-size:13px; font-weight:500; line-height:1.5; }
+.cpa-input, .cpa-select, .cpa-textarea { box-sizing:border-box; width:100%; border:.5px solid var(--dsw-alias-border-l4); border-radius:var(--dsw-radius-md); background:var(--dsw-alias-bg-layer-3); color:var(--dsw-alias-label-primary); font:inherit; font-size:13px; line-height:1.5; }
+.cpa-input, .cpa-select { height:34px; padding:0 12px; }
+.cpa-select { appearance:none; padding-right:32px; }
+.cpa-select-wrap { position:relative; display:block; min-width:0; }
+.cpa-select-chevron { position:absolute; top:50%; right:13px; width:6px; height:6px; margin-top:-4px; border-right:1.5px solid var(--dsw-alias-label-tertiary); border-bottom:1.5px solid var(--dsw-alias-label-tertiary); transform:rotate(45deg); pointer-events:none; }
+.cpa-textarea { min-height:88px; padding:8px 12px; resize:vertical; font-family:var(--dsh-font-family-code-default); font-size:12px; line-height:1.6; }
+.cpa-input:focus-visible, .cpa-select:focus-visible, .cpa-textarea:focus-visible { outline:none; border-color:var(--dsw-alias-state-business-primary); }
+.cpa-input:disabled, .cpa-select:disabled, .cpa-textarea:disabled { color:var(--dsw-alias-label-tertiary); cursor:default; }
+.cpa-toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0; }
+.cpa-count { font-size:12px; line-height:18px; color:var(--dsw-alias-label-tertiary); }
+.cpa-models { display:flex; flex-direction:column; min-width:0; max-height:min(520px,60vh); overflow-y:auto; scrollbar-gutter:stable; border:.5px solid var(--dsw-alias-border-l2); border-radius:var(--dsw-radius-lg); }
+.cpa-model { display:flex; flex-direction:column; gap:6px; min-width:0; padding:12px 14px; }
+.cpa-model + .cpa-model { border-top:.5px solid var(--dsw-alias-border-l2); }
+.cpa-model-head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; min-width:0; }
+.cpa-model-id { min-width:0; font-family:var(--dsh-font-family-code-default); font-size:12px; line-height:18px; color:var(--dsw-alias-label-tertiary); overflow-wrap:anywhere; }
+.cpa-trace { margin-top:2px; }
+.cpa-model-meta { display:flex; flex-wrap:wrap; align-items:center; gap:6px; min-width:0; }
+.cpa-details { min-width:0; font-size:12px; line-height:1.6; }
+.cpa-details > summary { cursor:pointer; color:var(--dsw-alias-label-tertiary); }
+.cpa-details > summary:hover { color:var(--dsw-alias-label-secondary); }
+.cpa-details-body { display:flex; flex-direction:column; gap:4px; padding:8px 0 0 14px; min-width:0; }
+.cpa-details-body p { margin:0; overflow-wrap:anywhere; }
+.cpa-json { margin:0; padding:0 0 0 16px; min-width:0; overflow-wrap:anywhere; }
+.cpa-json li { margin:2px 0; }
+.cpa-value { white-space:pre-wrap; overflow-wrap:anywhere; }
+.cpa-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0; }
+.cpa-actions-end { margin-left:auto; }
+.cpa-pending { display:flex; flex-direction:column; gap:8px; padding:12px 14px; border:.5px solid var(--dsw-alias-border-l4); border-radius:var(--dsw-radius-lg); background:var(--dsw-alias-bg-layer-1); }
+`
+
+    // One dot per connection state, so the page reads at a glance instead of
+    // asking the reader to parse a sentence first.
+    const statusDots = { 'not-configured': 'idle', disabled: 'idle', 'missing-credential': 'warning', 'catalog-loading': 'ongoing', ready: 'done', stale: 'warning', reconfiguring: 'ongoing', 'no-models': 'warning', error: 'error' }
 
     function validBaseURL(value, messages) {
       if (!value) throw new Error(messages.baseRequired)
@@ -162,16 +192,16 @@ window.__ModuleLoader__.load({
     function metadataValue(value, t) {
       if (value !== null && typeof value === 'object') {
         const entries = Object.entries(value)
-        if (!entries.length) return React.createElement('span', { style: styles.status }, t('empty'))
-        return React.createElement('ul', { style: styles.metadata }, entries.map(([key, child]) =>
+        if (!entries.length) return React.createElement('span', { className: 'cpa-note' }, t('empty'))
+        return React.createElement('ul', { className: 'cpa-json' }, entries.map(([key, child]) =>
           React.createElement('li', { key },
             child !== null && typeof child === 'object'
-              ? React.createElement('details', { style: styles.details }, React.createElement('summary', { style: styles.summary }, key), metadataValue(child, t))
-              : React.createElement('span', { style: styles.value }, key + ': ', String(child)),
+              ? React.createElement('details', { className: 'cpa-details' }, React.createElement('summary', null, key), metadataValue(child, t))
+              : React.createElement('span', { className: 'cpa-value' }, key + ': ', String(child)),
           ),
         ))
       }
-      return React.createElement('span', { style: styles.value }, String(value))
+      return React.createElement('span', { className: 'cpa-value' }, String(value))
     }
 
     function modelEfforts(model, t) {
@@ -180,33 +210,35 @@ window.__ModuleLoader__.load({
         ? raw.supported_reasoning_levels.map((entry) => typeof entry === 'string' ? entry : entry?.effort).filter((value) => typeof value === 'string')
         : Object.values(model.reasoningEfforts || {})
       const efforts = [...new Set(advertised)]
-      return React.createElement('div', { style: styles.efforts },
-        React.createElement('span', { style: styles.status }, efforts.length ? t('efforts') + ':' : t('effortUnknown')),
+      return React.createElement('div', { className: 'cpa-model-meta' },
+        React.createElement('span', { className: 'cpa-count' }, efforts.length ? t('efforts') + ':' : t('effortUnknown')),
         efforts.map((effort) => React.createElement(Tag, { key: effort, tone: effort === raw.default_reasoning_level ? 'info' : 'neutral' }, effort)),
-        typeof (model.defaultReasoningEffort || raw.default_reasoning_level) === 'string' ? React.createElement('span', { style: styles.status }, t('defaultEffort') + ': ' + (model.defaultReasoningEffort || raw.default_reasoning_level)) : null,
+        typeof (model.defaultReasoningEffort || raw.default_reasoning_level) === 'string' ? React.createElement('span', { className: 'cpa-count' }, t('defaultEffort') + ': ' + (model.defaultReasoningEffort || raw.default_reasoning_level)) : null,
       )
     }
 
     function modelDetails(model, t) {
       const raw = model.catalogMetadata && typeof model.catalogMetadata === 'object' ? model.catalogMetadata : {}
       const source = (key) => model.catalogSources?.[key] === 'default' ? t('sourceDefault') : model.catalogSources?.[key] === 'cpa' ? t('sourceCPA') : model.catalogSources?.[key] === 'override' ? t('sourceOverride') : ''
-      const line = (label, value, provenance) => value === undefined || value === null ? null : React.createElement('p', { style: styles.status }, label, ': ', String(value), provenance ? ' (' + provenance + ')' : '')
-      return React.createElement('details', { style: styles.details },
-        React.createElement('summary', { style: styles.summary }, t('details')),
-        line(t('context'), model.contextWindow?.toLocaleString(), source('contextWindow')),
-        line(t('output'), model.maxTokens?.toLocaleString(), source('maxTokens')),
-        line(t('modalities'), (model.inputModalities || model.input || []).join(', '), source('inputModalities')),
-        raw.description != null ? React.createElement('div', null, t('description'), ': ', metadataValue(raw.description, t)) : null,
-        raw.default_reasoning_level != null ? React.createElement('div', null, t('defaultEffort'), ': ', metadataValue(raw.default_reasoning_level, t)) : null,
-        Array.isArray(raw.supported_reasoning_levels) ? React.createElement('div', null,
-          t('efforts'),
-          React.createElement('ul', { style: styles.metadata }, raw.supported_reasoning_levels.map((entry, index) =>
-            React.createElement('li', { key: index, style: styles.value }, typeof entry === 'string' ? entry
-              : entry && typeof entry.effort === 'string' ? entry.effort + (typeof entry.description === 'string' ? ' — ' + entry.description : '')
-                : metadataValue(entry, t)),
-          )),
-        ) : model.reasoningEfforts ? React.createElement('div', null, t('efforts'), metadataValue(model.reasoningEfforts, t)) : null,
-        React.createElement('details', { style: styles.details }, React.createElement('summary', { style: styles.summary }, t('rawDetails')), metadataValue(raw, t)),
+      const line = (label, value, provenance) => value === undefined || value === null ? null : React.createElement('p', null, label, ': ', String(value), provenance ? ' (' + provenance + ')' : '')
+      return React.createElement('details', { className: 'cpa-details' },
+        React.createElement('summary', null, t('details')),
+        React.createElement('div', { className: 'cpa-details-body' },
+          line(t('context'), model.contextWindow?.toLocaleString(), source('contextWindow')),
+          line(t('output'), model.maxTokens?.toLocaleString(), source('maxTokens')),
+          line(t('modalities'), (model.inputModalities || model.input || []).join(', '), source('inputModalities')),
+          raw.description != null ? React.createElement('p', null, t('description'), ': ', metadataValue(raw.description, t)) : null,
+          raw.default_reasoning_level != null ? React.createElement('p', null, t('defaultEffort'), ': ', metadataValue(raw.default_reasoning_level, t)) : null,
+          Array.isArray(raw.supported_reasoning_levels) ? React.createElement('div', null,
+            React.createElement('p', null, t('efforts')),
+            React.createElement('ul', { className: 'cpa-json' }, raw.supported_reasoning_levels.map((entry, index) =>
+              React.createElement('li', { key: index, className: 'cpa-value' }, typeof entry === 'string' ? entry
+                : entry && typeof entry.effort === 'string' ? entry.effort + (typeof entry.description === 'string' ? ' — ' + entry.description : '')
+                  : metadataValue(entry, t)),
+            )),
+          ) : model.reasoningEfforts ? React.createElement('p', null, t('efforts'), ': ', metadataValue(model.reasoningEfforts, t)) : null,
+          React.createElement('details', { className: 'cpa-details' }, React.createElement('summary', null, t('rawDetails')), metadataValue(raw, t)),
+        ),
       )
     }
 
@@ -223,7 +255,7 @@ window.__ModuleLoader__.load({
       if (typeof diagnostic.requestId === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(diagnostic.requestId)) fields.push(t('diagnosticRequestId') + ': ' + diagnostic.requestId)
       if (Number.isFinite(diagnostic.at) && diagnostic.at >= 0 && diagnostic.at <= 8640000000000000) fields.push(t('diagnosticAt') + ': ' + new Date(diagnostic.at).toISOString())
       if (Number.isSafeInteger(diagnostic.toolCount) && diagnostic.toolCount >= 0) fields.push(t('diagnosticToolCount') + ': ' + diagnostic.toolCount)
-      return React.createElement('p', { key: index, role: 'status' }, fields.join(' · '))
+      return React.createElement('p', { key: index, className: 'cpa-note', role: 'status' }, fields.join(' · '))
     }
 
     function SettingsTab({ t, view, useScope }) {
@@ -336,41 +368,92 @@ window.__ModuleLoader__.load({
       const list = models || []
       const selected = (model) => Object.hasOwn(draft, model.id) ? draft[model.id] : state?.modelSelection?.[model.id] !== false
       const filtered = list.filter((model) => (model.name || '').toLowerCase().includes(search.toLowerCase()) || model.id.toLowerCase().includes(search.toLowerCase()))
-      const button = (label, action, disabled = !writable) => React.createElement(Button, { type: 'button', disabled, onClick: action }, t(label))
-      return React.createElement('div', { style: styles.section, 'aria-busy': busy || !state },
-        React.createElement('h2', { style: styles.title }, t('title')),
-        React.createElement('p', { style: styles.status }, t('intro')),
-        !state ? React.createElement('p', { role: 'status' }, t('loading')) : React.createElement('p', { role: 'status' }, t(statusKeys[state.status] || 'statusError')),
-        snapshot?.status === 'ready' && !snapshot.writable ? React.createElement('p', { role: 'status' }, t('readOnly')) : null,
-        state?.activationError ? React.createElement('p', { role: 'alert' }, t('activationFailed')) : null,
-        state ? React.createElement('p', { role: 'status' }, t('revision'), ': ', state.revision, state.operationId ? ' · ' + t('operationId') + ': ' + state.operationId : '') : null,
-        lastOperation ? React.createElement('p', { role: 'status' }, t('operationId'), ': ', lastOperation) : null,
-        state?.catalog?.error ? React.createElement('p', { role: 'status' }, t(Object.hasOwn(catalogErrorKeys, state.catalog.error.code) ? catalogErrorKeys[state.catalog.error.code] : 'catalogError')) : null,
-        (state?.diagnostics || []).map((diagnostic, index) => diagnosticView(diagnostic, index, t)),
-        feedback ? React.createElement('p', { role: 'status' }, feedback) : null,
-        pending ? React.createElement('div', null, React.createElement('p', null, t('operationId'), ': ', pending.operationId), button('reconcile', async () => { setBusy(true); try { await reconcile(pending) } finally { setBusy(false) } }, busy), button('retryOperation', () => sendOperation(pending, true), busy || snapshot?.status !== 'ready' || !snapshot.writable), button('returnToEdit', () => returnToEdit(pending), busy)) : null,
-        React.createElement('form', { style: styles.form, onSubmit: submit },
-          React.createElement('label', { style: styles.field }, t('baseURL'), React.createElement(Input, { type: 'url', value: baseURL, disabled: !writable, onChange: (event) => { requestGeneration.current += 1; setBaseURL(event.currentTarget.value); setReuse(false); setApiKey('') } })),
-          baseURL.trim().toLowerCase().startsWith('http:') ? React.createElement('p', { role: 'note' }, t('httpWarning')) : null,
-          React.createElement('label', { style: styles.field }, t('authAction'), React.createElement('select', { value: authType, disabled: !writable, onChange: (event) => setAuthType(event.currentTarget.value) }, ['keep', 'replace', 'reference', 'none'].map((type) => React.createElement('option', { key: type, value: type }, t('auth' + type))))),
-          authType === 'replace' ? React.createElement('label', { style: styles.field }, t('apiKey'), React.createElement(Input, { type: 'password', value: apiKey, autoComplete: 'off', disabled: !writable || !state?.keyWritable, onChange: (event) => setApiKey(event.currentTarget.value) })) : null,
-          authType === 'reference' ? React.createElement('label', { style: styles.field }, t('reference'), React.createElement(Input, { value: reference, disabled: !writable, onChange: (event) => setReference(event.currentTarget.value) })) : null,
-          state?.baseURL && baseURL.trim() !== state.baseURL && (authType === 'keep' || authType === 'reference') ? React.createElement(Checkbox, { label: t('reuseConsent'), checked: reuse, disabled: !writable, onChange: setReuse }) : null,
-          React.createElement('label', { style: styles.field }, t('policy'), React.createElement('textarea', { value: policy, disabled: !writable, onChange: (event) => setPolicy(event.currentTarget.value) })),
-          React.createElement('p', { role: 'note' }, t('modelsHelp')),
-          React.createElement('div', { style: styles.toolbar }, button('loadModels', preview), button('refresh', refresh, !writable || !state?.generation)),
-          React.createElement('label', { style: styles.field }, t('search'), React.createElement(Input, { type: 'search', value: search, onChange: (event) => setSearch(event.currentTarget.value) })),
-          React.createElement('div', { style: styles.toolbar }, React.createElement('span', null, list.filter(selected).length, ' ', t('selectedCount'), ' ', list.length), button('selectAll', () => setDraft((current) => ({ ...current, ...Object.fromEntries(list.map((model) => [model.id, true])) }))), button('deselectAll', () => setDraft((current) => ({ ...current, ...Object.fromEntries(list.map((model) => [model.id, false])) })))),
-          list.length && !list.filter(selected).length ? React.createElement('p', { role: 'status' }, t('statusNoModels')) : null,
-          React.createElement('div', { style: styles.modelList }, filtered.map((model) => React.createElement('div', { key: model.id, style: styles.model }, React.createElement(Checkbox, { label: t('enabled') + ' ' + (model.name || model.id), checked: selected(model), disabled: !writable, onChange: (checked) => setDraft((current) => ({ ...current, [model.id]: checked })) }), React.createElement('span', null, model.id), modelEfforts(model, t), modelDetails(model, t)))),
-          list.length && !filtered.length ? React.createElement('p', { role: 'status' }, t('noMatches')) : null,
-          React.createElement(Button, { type: 'submit', disabled: !writable }, t('save')),
-          button('saveSelection', () => mutate('save-selection', { selectionChanges: draft })),
-          button(state?.enabled ? 'disconnect' : 'enableConnection', () => mutate('set-enabled', { enabled: !state.enabled }), !writable || !state?.configured),
-          React.createElement('p', { role: 'note' }, t('disconnectHelp')),
-          button('forgetKey', () => mutate('forget-key'), !writable || !state?.keyConfigured),
-          React.createElement('p', { role: 'note' }, t('forgetHelp')),
-          state?.legacy?.available ? button('importLegacy', () => mutate('import-legacy', { expectedLegacyRevision: state.legacy.revision, fingerprint: state.legacy.fingerprint })) : null,
+      const button = (label, action, disabled = !writable, variant = 'ghost', size) => React.createElement(Button, { type: 'button', variant, size, disabled, onClick: action }, t(label))
+      const note = (text, tone) => React.createElement('p', { className: 'cpa-note', 'data-tone': tone, role: 'status' }, text)
+      const field = (label, control, hint) => React.createElement('label', { className: 'cpa-field' },
+        React.createElement('span', { className: 'cpa-label' }, label),
+        control,
+        hint ? React.createElement('span', { className: 'cpa-note' }, hint) : null,
+      )
+      const section = (title, ...children) => React.createElement('section', { className: 'cpa-section' },
+        React.createElement('h3', { className: 'cpa-section-title' }, title),
+        ...children,
+      )
+      return React.createElement('div', { className: 'cpa-page', 'aria-busy': busy || !state },
+        React.createElement('style', { key: 'cpa-css' }, SETTINGS_CSS),
+        React.createElement('section', { className: 'cpa-section' },
+          React.createElement('div', { className: 'cpa-status' },
+            React.createElement(StateDot, { state: state ? statusDots[state.status] || 'error' : 'ongoing' }),
+            React.createElement('p', { className: 'cpa-status-text', role: 'status' }, state ? t(statusKeys[state.status] || 'statusError') : t('loading')),
+          ),
+          snapshot?.status === 'ready' && !snapshot.writable ? note(t('readOnly')) : null,
+          state?.activationError ? React.createElement('p', { className: 'cpa-note', 'data-tone': 'error', role: 'alert' }, t('activationFailed')) : null,
+          state?.catalog?.error ? note(t(Object.hasOwn(catalogErrorKeys, state.catalog.error.code) ? catalogErrorKeys[state.catalog.error.code] : 'catalogError'), 'warn') : null,
+          (state?.diagnostics || []).map((diagnostic, index) => diagnosticView(diagnostic, index, t)),
+          feedback ? note(feedback) : null,
+          state ? React.createElement('details', { className: 'cpa-details cpa-trace' },
+            React.createElement('summary', null, t('revision'), ': ', state.revision),
+            React.createElement('div', { className: 'cpa-details-body' },
+              state.operationId ? React.createElement('p', null, t('operationId'), ': ', state.operationId) : null,
+              lastOperation ? React.createElement('p', null, t('operationId'), ': ', lastOperation) : null,
+            ),
+          ) : null,
+          pending ? React.createElement('div', { className: 'cpa-pending' },
+            React.createElement('p', { className: 'cpa-note' }, t('operationId'), ': ', pending.operationId),
+            React.createElement('div', { className: 'cpa-actions' },
+              button('reconcile', async () => { setBusy(true); try { await reconcile(pending) } finally { setBusy(false) } }, busy, 'outline', 'sm'),
+              button('retryOperation', () => sendOperation(pending, true), busy || snapshot?.status !== 'ready' || !snapshot.writable, 'ghost', 'sm'),
+              button('returnToEdit', () => returnToEdit(pending), busy, 'ghost', 'sm'),
+            ),
+          ) : null,
+        ),
+        React.createElement('form', { className: 'cpa-form', onSubmit: submit },
+          section(t('connection'),
+            field(t('baseURL'), React.createElement(Input, { type: 'url', value: baseURL, disabled: !writable, onChange: (event) => { requestGeneration.current += 1; setBaseURL(event.currentTarget.value); setReuse(false); setApiKey('') } })),
+            baseURL.trim().toLowerCase().startsWith('http:') ? React.createElement('p', { className: 'cpa-note', 'data-tone': 'warn', role: 'note' }, t('httpWarning')) : null,
+            field(t('authAction'), React.createElement('span', { className: 'cpa-select-wrap' },
+              React.createElement('select', { className: 'cpa-select', value: authType, disabled: !writable, onChange: (event) => setAuthType(event.currentTarget.value) }, ['keep', 'replace', 'reference', 'none'].map((type) => React.createElement('option', { key: type, value: type }, t('auth' + type)))),
+              React.createElement('span', { className: 'cpa-select-chevron', 'aria-hidden': 'true' }),
+            )),
+            authType === 'replace' ? field(t('apiKey'), React.createElement(Input, { type: 'password', value: apiKey, autoComplete: 'off', disabled: !writable || !state?.keyWritable, onChange: (event) => setApiKey(event.currentTarget.value) })) : null,
+            authType === 'reference' ? field(t('reference'), React.createElement(Input, { value: reference, disabled: !writable, onChange: (event) => setReference(event.currentTarget.value) })) : null,
+            state?.baseURL && baseURL.trim() !== state.baseURL && (authType === 'keep' || authType === 'reference') ? React.createElement(Checkbox, { label: t('reuseConsent'), checked: reuse, disabled: !writable, onChange: setReuse }) : null,
+            field(t('policy'), React.createElement('textarea', { className: 'cpa-textarea', value: policy, disabled: !writable, onChange: (event) => setPolicy(event.currentTarget.value) })),
+          ),
+          section(t('models'),
+            React.createElement('p', { className: 'cpa-note', role: 'note' }, t('modelsHelp')),
+            React.createElement('div', { className: 'cpa-toolbar' }, button('loadModels', preview, !writable, 'outline'), button('refresh', refresh, !writable || !state?.generation)),
+            field(t('search'), React.createElement(Input, { type: 'search', value: search, onChange: (event) => setSearch(event.currentTarget.value) })),
+            React.createElement('div', { className: 'cpa-toolbar' },
+              React.createElement('span', { className: 'cpa-count' }, list.filter(selected).length, ' / ', list.length, ' ', t('selectedCount')),
+              button('selectAll', () => setDraft((current) => ({ ...current, ...Object.fromEntries(list.map((model) => [model.id, true])) })), !writable, 'ghost', 'sm'),
+              button('deselectAll', () => setDraft((current) => ({ ...current, ...Object.fromEntries(list.map((model) => [model.id, false])) })), !writable, 'ghost', 'sm'),
+            ),
+            list.length && !list.filter(selected).length ? note(t('statusNoModels'), 'warn') : null,
+            list.length
+              ? React.createElement('div', { className: 'cpa-models' }, filtered.map((model) => React.createElement('div', { key: model.id, className: 'cpa-model' },
+                React.createElement('div', { className: 'cpa-model-head' },
+                  React.createElement(Checkbox, { label: t('enabled') + ' ' + (model.name || model.id), checked: selected(model), disabled: !writable, onChange: (checked) => setDraft((current) => ({ ...current, [model.id]: checked })) }),
+                  model.name && model.name !== model.id ? React.createElement('span', { className: 'cpa-model-id' }, model.id) : null,
+                ),
+                modelEfforts(model, t),
+                modelDetails(model, t),
+              )))
+              : React.createElement('p', { className: 'cpa-note' }, t('noModels')),
+          ),
+          section(t('actions'),
+            React.createElement('div', { className: 'cpa-actions' },
+              React.createElement(Button, { type: 'submit', variant: 'primary', disabled: !writable }, t('save')),
+              button('saveSelection', () => mutate('save-selection', { selectionChanges: draft }), !writable, 'outline'),
+              button(state?.enabled ? 'disconnect' : 'enableConnection', () => mutate('set-enabled', { enabled: !state.enabled }), !writable || !state?.configured),
+            ),
+            React.createElement('p', { className: 'cpa-note', role: 'note' }, t('disconnectHelp')),
+            React.createElement('div', { className: 'cpa-actions' },
+              button('forgetKey', () => mutate('forget-key'), !writable || !state?.keyConfigured),
+              state?.legacy?.available ? button('importLegacy', () => mutate('import-legacy', { expectedLegacyRevision: state.legacy.revision, fingerprint: state.legacy.fingerprint })) : null,
+            ),
+            React.createElement('p', { className: 'cpa-note', role: 'note' }, t('forgetHelp')),
+          ),
         ),
       )
     }
@@ -378,7 +461,17 @@ window.__ModuleLoader__.load({
     function ModelsFooter({ t, pluginNavigation }) {
       const [state, setState] = useState(null)
       useEffect(() => { let active = true; readState().then((value) => { if (active) setState(value) }).catch(() => { }); return () => { active = false } }, [])
-      return React.createElement('div', null, React.createElement('p', { role: 'status' }, 'CLIProxyAPI: ', t(state ? statusKeys[state.status] || 'statusError' : 'loading')), React.createElement(Button, { type: 'button', onClick: () => pluginNavigation.openList() }, t('openSettings')), React.createElement('p', null, t('chooseCPA')))
+      return React.createElement('div', { className: 'cpa-page' },
+        React.createElement('style', { key: 'cpa-css' }, SETTINGS_CSS),
+        React.createElement('div', { className: 'cpa-status' },
+          React.createElement(StateDot, { state: state ? statusDots[state.status] || 'error' : 'ongoing' }),
+          React.createElement('p', { className: 'cpa-status-text', role: 'status' }, 'CLIProxyAPI: ', t(state ? statusKeys[state.status] || 'statusError' : 'loading')),
+        ),
+        React.createElement('div', { className: 'cpa-actions' },
+          React.createElement(Button, { type: 'button', variant: 'outline', onClick: () => pluginNavigation.openList() }, t('openSettings')),
+          React.createElement('span', { className: 'cpa-note' }, t('chooseCPA')),
+        ),
+      )
     }
 
     function apply(ctx) {

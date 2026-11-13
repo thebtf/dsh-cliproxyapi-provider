@@ -28,7 +28,7 @@ async function harness(initial = state()) {
   await import(`../client.js?test=${Math.random()}`)
   const states = []; let cursor = 0; const effects = []
   const React = { Fragment: 'fragment', createElement(type, props, ...children) { return { type, props: props || {}, children } }, useState(initialValue) { const i = cursor++; if (!(i in states)) states[i] = initialValue; return [states[i], (next) => { states[i] = typeof next === 'function' ? next(states[i]) : next }] }, useRef(value) { const i = cursor++; return states[i] ??= { current: value } }, useEffect(fn) { const i = cursor++; if (!(i in states)) { states[i] = true; effects.push(fn) } } }
-  const primitives = { Button: 'button', Input: 'input', Checkbox: 'checkbox', Tag: 'tag' }
+  const primitives = { Button: 'button', Input: 'input', Checkbox: 'checkbox', Tag: 'tag', StateDot: 'statedot' }
   const plugin = definition.factory((id) => id === 'react' ? React : primitives)
   const registrations = {}; const dictionaries = {}; let opened = 0
   const scope = { getSnapshot() { return { status: 'ready', writable: true } }, subscribe() { return () => { } } }
@@ -80,7 +80,7 @@ test('metadata stays text, with provenance, effort and bulk search', async () =>
   assert.ok(text(tree).includes('<img src=x>')); assert.equal(find(tree, (n) => n.type === 'img' || n.props.dangerouslySetInnerHTML).length, 0)
   h.input(tree, 'search').props.onChange({ currentTarget: { value: 'alpha' } }); tree = h.render()
   assert.equal(find(tree, (n) => n.type === 'checkbox').length, 1)
-  h.button(tree, 'selectAll').props.onClick(); tree = h.render(); assert.match(text(tree), /2\s+selectedCount\s+2/)
+  h.button(tree, 'selectAll').props.onClick(); tree = h.render(); assert.match(text(tree), /2\s+\/\s+2\s+selectedCount/)
 })
 
 test('footer uses public Plugins list and dictionaries cover all status keys', async () => {
@@ -91,6 +91,13 @@ test('footer uses public Plugins list and dictionaries cover all status keys', a
   h.button(tree, 'openSettings').props.onClick(); assert.equal(h.opened, 1); assert.match(text(tree), /chooseCPA/)
   const source = await readFile(new URL('../client.js', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /llm-pi-ai|MutationObserver|document\.|127\.0\.0\.1/)
+})
+
+test('every dictionary carries the same keys so no copy falls back to English', async () => {
+  const h = await harness(); const dict = h.dictionaries['settings.cliProxyApi']
+  const keys = Object.keys(dict.en).sort()
+  for (const language of ['ru', 'zh']) assert.deepEqual(Object.keys(dict[language]).sort(), keys, language)
+  for (const language of ['en', 'ru', 'zh']) for (const key of keys) assert.ok(String(dict[language][key]).trim(), `${language}:${key}`)
 })
 
 test('selection-only saves use new CAS and keep connection draft', async () => {
