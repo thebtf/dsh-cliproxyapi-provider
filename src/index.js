@@ -6,6 +6,7 @@ import { Config as PiAiConfig } from '@deepseek-ai/dsh-llm-pi-ai'
 import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
 import { catalogURL, readCodexCatalogWithMetadata } from './catalog.js'
 import { installGateway } from './gateway.js'
+import { protocolOf } from './policy.js'
 import { ConnectionError, resolveIdentity, validateEndpoint } from './connection.js'
 
 const MAX_CATALOG_BYTES = 4 * 1024 * 1024
@@ -247,7 +248,7 @@ async function profileOf(profile, models, hasApiKey, config) {
   const candidate = {
     ...rest,
     displayName: PROVIDER,
-    api: 'openai-responses',
+    api: protocolOf(profile),
     baseURL: normalizedBaseURL(profile.baseURL),
     // This enables pi-ai's explicit strict:false, avoiding upstream auto-strict.
     compat: { ...profile.compat, supportsStrictMode: true },

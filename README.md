@@ -2,19 +2,19 @@
 
 [English](./README_EN.md) | 简体中文
 
-通过 OpenAI Responses API 将一个 CLIProxyAPI 网关连接到 DeepSeek Harness，保留现有会话的 `CLIProxyAPI` 和模型 ID。
+将一个 CLIProxyAPI 网关连接到 DeepSeek Harness。可选择通信协议——OpenAI Responses（默认）、OpenAI Chat Completions、Anthropic Messages 或 Google Generative AI——插件会原生使用该协议。保留现有会话的 `CLIProxyAPI` 和模型 ID。
 
 ## 安装与配置
 
 需要 Node.js 24.9.0 或更新版本和 DeepSeek Harness 0.2.2-rc.2（`engines.dsh` 允许 0.2.x 系列，核心小版本更新不会停用插件）：
 
 ```powershell
-npx @deepseek-ai/dsh plugin --profile web add 'github:thebtf/dsh-cliproxyapi-provider#v0.4.0'
+npx @deepseek-ai/dsh plugin --profile web add 'github:thebtf/dsh-cliproxyapi-provider#v0.4.2'
 # 滚动通道：github:thebtf/dsh-cliproxyapi-provider#latest
 npx @deepseek-ai/dsh web
 ```
 
-安装或升级后重启 Web 或 Desktop。在侧边栏 **插件** 页面选择 **CLIProxyAPI**，填写实际地址；不会自动假定本地地址。明确选择保留身份、替换密钥、使用凭据引用或不使用验证。HTTP 不加密，密钥和请求可能泄露；对新地址重用已有身份需要明确同意。
+安装或升级后重启 Web 或 Desktop。在侧边栏 **插件** 页面选择 **CLIProxyAPI**，先选择网关提供的通信协议，再填写实际地址；不会自动假定本地地址。模型目录对所有协议都从同一个 `/models` 地址读取。明确选择保留身份、替换密钥、使用凭据引用或不使用验证。HTTP 不加密，密钥和请求可能泄露；对新地址重用已有身份需要明确同意。
 
 预览目录后可搜索、选择模型；批量操作针对全部已加载模型。保存会一起提交地址、验证操作、策略和模型草稿。允许保存零个模型，但此时原生连接不可用。暂时缺失的模型选择会保留，新模型默认启用。模型详情显示元数据、能力来源和已声明的推理等级。刷新失败时保留上次可用目录并标记过期；保存成功不代表激活成功。
 
@@ -22,7 +22,7 @@ npx @deepseek-ai/dsh web
 
 ## 迁移与回退
 
-显式导入之前，旧的通用 CLIProxyAPI 配置继续拥有原有路由。在 CPA 页面选择 **导入旧连接**；所有权不明确、缺少地址或字段无法迁移时，应按提示修复，不会静默覆盖。切换时可能短暂中断。不要用旧备份覆盖较新设置；只有迁移恢复／回退的所有权与版本检查允许时才能回退，否则应向前修复。升级前保留备份，更换版本后重启。
+旧的通用 CLIProxyAPI 配置在插件接管前拥有原有路由。保存第一个连接时会自动接管该配置：插件记录完整备份、移除旧条目，并在首次目录刷新成功后完成切换。也可在 CPA 页面显式选择 **导入旧连接**。所有权不明确、缺少地址或字段无法迁移时会给出提示，不会静默覆盖。切换时可能短暂中断。不要用旧备份覆盖较新设置；只有迁移恢复／回退的所有权与版本检查允许时才能回退，否则应向前修复。升级前保留备份，更换版本后重启。
 
 ## Models 集成范围
 

@@ -1,8 +1,55 @@
 import { openAIResponsesApi } from '@earendil-works/pi-ai/api/openai-responses.lazy'
+import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
+import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messages.lazy'
+import { googleGenerativeAIApi } from '@earendil-works/pi-ai/api/google-generative-ai.lazy'
+import { PROTOCOLS } from './policy.js'
 
-export function createTransport(baseURL, diagnostics, fetchImpl = globalThis.fetch, keyless = false) {
+const FACTORIES = {
+  'openai-responses': openAIResponsesApi,
+  'openai-completions': openAICompletionsApi,
+  'anthropic-messages': anthropicMessagesApi,
+  'google-generative-ai': googleGenerativeAIApi,
+}
+
+// Each wire protocol ends its SSE stream differently. The scanner only feeds the
+// diagnostics panel, so an unknown protocol degrades to "no terminal event seen"
+// instead of guessing.
+const TERMINALS = {
+  'openai-responses': (line) => {
+    const match = /^(?:event:\s*|data:\s*\{"type"\s*:\s*")(response\.(?:completed|failed|incomplete))/.exec(line)
+    return match ? match[1].replace('response.', 'sse-') : undefined
+  },
+  'openai-completions': (line) => {
+    if (/^data:\s*\[DONE\]/.test(line)) return 'sse-completed'
+    return /^data:\s*\{/.test(line) && /"error"\s*:/.test(line) ? 'sse-failed' : undefined
+  },
+  'anthropic-messages': (line) => {
+    const match = /^(?:event:\s*|data:\s*\{[^\n]*"type"\s*:\s*")(message_stop|error)/.exec(line)
+    if (!match) return undefined
+    return match[1] === 'error' ? 'sse-failed' : 'sse-completed'
+  },
+  'google-generative-ai': (line) => {
+    const match = /^(?:event:\s*|data:\s*\{[^\n]*"type"\s*:\s*")(result|error)/.exec(line)
+    if (!match) return undefined
+    return match[1] === 'error' ? 'sse-failed' : 'sse-completed'
+  },
+}
+
+export function resolveProtocol(protocol) {
+  return PROTOCOLS.includes(protocol) ? protocol : 'openai-responses'
+}
+
+export function terminalStage(protocol, line) {
+  return TERMINALS[resolveProtocol(protocol)](line)
+}
+
+export function createTransport(protocol, baseURL, diagnostics, fetchImpl = globalThis.fetch, keyless = false) {
+  const api = resolveProtocol(protocol)
   const origin = new URL(baseURL).origin
-  const native = openAIResponsesApi()
+  const native = FACTORIES[api]()
+  const terminalOf = TERMINALS[api]
+  // Google streams carry no sentinel, so a clean flush is a completed stream.
+  const flushStage = api === 'google-generative-ai' ? 'sse-completed' : 'sse-incomplete'
   const record = (entry) => {
     diagnostics.push({ at: Date.now(), ...entry })
     if (diagnostics.length > 50) diagnostics.splice(0, diagnostics.length - 50)
@@ -31,13 +78,13 @@ export function createTransport(baseURL, diagnostics, fetchImpl = globalThis.fet
         const lines = pending.split(/\r?\n/)
         pending = lines.pop().slice(-1024)
         for (const line of lines) {
-          const match = /^(?:event:\s*|data:\s*\{"type"\s*:\s*")(response\.(?:completed|failed|incomplete))/.exec(line)
-          if (match && !terminal) { terminal = true; cleanup(); record({ stage: match[1].replace('response.', 'sse-') }) }
+          const stage = terminalOf(line)
+          if (stage && !terminal) { terminal = true; cleanup(); record({ stage }) }
         }
       }
       const body = response.body.pipeThrough(new TransformStream({
         transform(chunk, controller) { inspect(decoder.decode(chunk, { stream: true })); controller.enqueue(chunk) },
-        flush() { inspect(decoder.decode() + '\n'); cleanup(); if (!terminal) record({ stage: 'sse-incomplete' }) },
+        flush() { inspect(decoder.decode() + '\n'); cleanup(); if (!terminal) record({ stage: flushStage }) },
       }))
       return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers })
     } catch (error) {

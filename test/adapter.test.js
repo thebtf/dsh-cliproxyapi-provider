@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { createGatewayAdapter } from '../src/adapter.js'
 
 const model = { id: 'model', name: 'Model', contextWindow: 10000, maxTokens: 500, inputModalities: ['text', 'image'], reasoningEfforts: { low: 'low', high: 'high' } }
-const snapshot = (baseURL) => ({ baseURL, authIdentity: { type: 'none' }, modelSelection: {}, policy: {}, models: [model] })
+const snapshot = (baseURL, policy = {}) => ({ baseURL, authIdentity: { type: 'none' }, modelSelection: {}, policy, models: [model] })
+const published = (adapter) => adapter.config.profiles().get('CLIProxyAPI').piProvider.getAllModels()
 
 test('adapter preserves model capabilities and captured generation', async () => {
   const ctx = { credentials: {}, get: () => undefined }
@@ -15,4 +16,16 @@ test('adapter preserves model capabilities and captured generation', async () =>
   assert.equal(adapter.providerRetryPolicy('CLIProxyAPI').maxRetries, 5)
   assert.equal(prepared.model.id, 'model')
   assert.equal((await adapter.resolveModel('CLIProxyAPI', 'model')).id, 'model')
+})
+
+test('adapter publishes the selected wire protocol and defaults to Responses', async () => {
+  const ctx = { credentials: {}, get: () => undefined }
+  const { adapter, update } = createGatewayAdapter(ctx, snapshot('https://one.invalid/v1'), [])
+  assert.equal(published(adapter)[0].api, 'openai-responses')
+  for (const api of ['openai-completions', 'anthropic-messages', 'google-generative-ai']) {
+    update(snapshot('https://one.invalid/v1', { api }))
+    assert.equal(published(adapter)[0].api, api)
+  }
+  update(snapshot('https://one.invalid/v1', { api: 'not-a-protocol' }))
+  assert.equal(published(adapter)[0].api, 'openai-responses')
 })
