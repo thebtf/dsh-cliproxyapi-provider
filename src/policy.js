@@ -3,9 +3,17 @@ import { Config as NativePiAiConfig } from '@deepseek-ai/dsh-llm-pi-ai'
 import { ConnectionError } from './connection.js'
 import { credentialField } from './secrets.js'
 
+// The wire protocols this build can serve. The order is the presentation order:
+// the first entry is the default a fresh connection starts with.
+export const PROTOCOLS = ['openai-responses', 'openai-completions', 'anthropic-messages', 'google-generative-ai']
+export const DEFAULT_PROTOCOL = PROTOCOLS[0]
+
 const fields = new Set(['displayName', 'api', 'defaultContextWindow', 'defaultMaxTokens', 'defaultInput', 'headers', 'compat', 'retryPolicy', 'reasoning', 'thinkingBudgets', 'streamIdleTimeoutMs', 'maxRequestImageBytes', 'maxRequestImages', 'imageOffloadCountQuantum', 'requestImagePixelBudget', 'requestImageMaxBytes', 'cacheRetention', 'transport', 'timeoutMs', 'websocketConnectTimeoutMs'])
 const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
 const containsCredentials = (v) => object(v) && Object.entries(v).some(([k, x]) => credentialField(k) || containsCredentials(x)) || Array.isArray(v) && v.some(containsCredentials)
+export function protocolOf(policy) {
+  return PROTOCOLS.includes(policy?.api) ? policy.api : DEFAULT_PROTOCOL
+}
 export function validatePolicy(policy = {}) {
   try {
     if (!object(policy) || containsCredentials(policy) || Object.keys(policy).some((k) => !fields.has(k))) throw 0
@@ -19,11 +27,11 @@ export function validatePolicy(policy = {}) {
     if (policy.cacheRetention !== undefined && !['none', 'short', 'long'].includes(policy.cacheRetention)) throw 0
     if (policy.transport !== undefined && !['auto', 'sse', 'websocket', 'websocket-cached'].includes(policy.transport)) throw 0
     if (policy.reasoning !== undefined && !['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(policy.reasoning)) throw 0
-    if (policy.displayName !== undefined && typeof policy.displayName !== 'string' || policy.api !== undefined && policy.api !== 'openai-responses') throw 0
+    if (policy.displayName !== undefined && typeof policy.displayName !== 'string' || policy.api !== undefined && !PROTOCOLS.includes(policy.api)) throw 0
     if (policy.retryPolicy !== undefined && (!object(policy.retryPolicy) || policy.retryPolicy.backoff !== undefined && !object(policy.retryPolicy.backoff) || policy.retryPolicy.retryableCodes !== undefined && !Array.isArray(policy.retryPolicy.retryableCodes))) throw 0
     resolveRetryPolicy(policy.retryPolicy, 'CPA')
     const checked = NativePiAiConfig['~standard'].validate({
-      providers: { 'cpa-policy-validation': { ...policy, api: 'openai-responses', baseURL: 'https://policy.invalid/v1', models: [{ id: 'policy-validation' }] } },
+      providers: { 'cpa-policy-validation': { ...policy, api: protocolOf(policy), baseURL: 'https://policy.invalid/v1', models: [{ id: 'policy-validation' }] } },
     })
     if (!checked || typeof checked.then === 'function' || checked.issues) throw 0
     const parsed = checked.value.providers.get()['cpa-policy-validation']

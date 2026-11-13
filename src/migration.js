@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { ConnectionError, validateEndpoint } from './connection.js'
 import { credentialField } from './secrets.js'
-import { validatePolicy } from './policy.js'
+import { PROTOCOLS, validatePolicy } from './policy.js'
 
 const OWN = 'llm-cliproxyapi'
 const LEGACY = 'llm-pi-ai'
@@ -45,7 +45,7 @@ export async function prepareLegacy(settings, input) {
   if (!summary.available || summary.fingerprint !== input.fingerprint) throw new ConnectionError('MIGRATION_CONFLICT', summary.reason ?? 'Legacy provider changed')
   const profile = portableProfile(legacy.user.providers[PROVIDER])
   validateEndpoint(profile.baseURL)
-  if (profile.api && profile.api !== 'openai-responses') throw new ConnectionError('MIGRATION_UNSUPPORTED', 'Legacy wire protocol cannot be migrated')
+  if (profile.api !== undefined && !PROTOCOLS.includes(profile.api)) throw new ConnectionError('MIGRATION_UNSUPPORTED', 'Legacy wire protocol cannot be migrated')
   const known = new Set(['displayName', 'api', 'baseURL', 'apiKeyEnv', 'models', 'modelOverrides', 'defaultContextWindow', 'defaultMaxTokens', 'defaultInput', 'headers', 'compat', 'retryPolicy', 'reasoning', 'thinkingBudgets', 'streamIdleTimeoutMs', 'maxRequestImageBytes', 'maxRequestImages', 'imageOffloadCountQuantum', 'requestImagePixelBudget', 'requestImageMaxBytes', 'cacheRetention', 'transport', 'timeoutMs', 'websocketConnectTimeoutMs'])
   if (Object.keys(profile).some((key) => !known.has(key))) throw new ConnectionError('MIGRATION_UNSUPPORTED', 'Legacy provider has unsupported fields')
   if (typeof input.operationId !== 'string' || !input.operationId) throw new ConnectionError('INVALID_OPERATION', 'An operation ID is required')
@@ -67,6 +67,17 @@ export async function prepareLegacy(settings, input) {
   const migration = { phase: 'prepared', operationId: input.operationId, generation, legacyRevision: legacy.revision, fingerprint: summary.fingerprint, backupFingerprint: fingerprintOf(profile), backup: profile, provenance: 'legacy' }
   await setOwn(settings, { baseURL, authIdentity, enabled: true, generation, operationId: input.operationId, policy, overrides, migration }, own.revision)
   return migration
+}
+// Undo a prepared-but-not-cut-over migration. The legacy provider is still in
+// place at this point, so only our own row is cleared; rollbackLegacy is for the
+// post-cutover case where the legacy entry has to be restored.
+export async function discardPrepared(settings) {
+  const { own } = rows(settings)
+  const migration = own?.value?.migration
+  if (!migration || migration.phase !== 'prepared') return false
+  if (own.value.generation !== migration.generation) throw new ConnectionError('MIGRATION_CONFLICT', 'Connection changed after migration; forward repair is required')
+  await settings.mutate(OWN, ['baseURL', 'authIdentity', 'generation', 'operationId', 'policy', 'overrides', 'migration'].map((key) => ({ op: 'unset', path: [key] })), own.revision)
+  return true
 }
 export async function cutoverLegacy(settings) {
   let { own, legacy } = rows(settings)

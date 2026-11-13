@@ -15,6 +15,14 @@ window.__ModuleLoader__.load({
     const SETTINGS_LOCALE_NS = 'settings.cliProxyApi'
     const SETTINGS_SUMMARY_NS = 'llm-cliproxyapi'
     const inject = ['slots', 'locale', 'configForms', 'pluginNavigation']
+    // Presentation order; the first entry is the default for a new connection.
+    const PROTOCOLS = ['openai-responses', 'openai-completions', 'anthropic-messages', 'google-generative-ai']
+    const protocolKeys = {
+      'openai-responses': 'protocolResponses',
+      'openai-completions': 'protocolCompletions',
+      'anthropic-messages': 'protocolAnthropic',
+      'google-generative-ai': 'protocolGoogle',
+    }
 
     const copy = {
       en: {
@@ -106,6 +114,10 @@ window.__ModuleLoader__.load({
     Object.assign(copy.en, { retryOperation: 'Retry the same operation', returnToEdit: 'Return to editing', conflictPending: 'The result cannot be confirmed because settings changed. Return to editing and review your draft before saving.', diagnosticHttp: 'HTTP response', diagnosticPayload: 'Request payload', diagnosticBeforeHttp: 'Before HTTP response', diagnosticTimeout: 'Timeout', diagnosticAbort: 'Cancelled', diagnosticSseCompleted: 'Stream completed', diagnosticSseFailed: 'Stream failed', diagnosticSseIncomplete: 'Stream incomplete', diagnosticStatus: 'HTTP status', diagnosticRequestId: 'Request ID', diagnosticAt: 'Time', diagnosticToolCount: 'Tool count', catalogAuth: 'Catalog authentication failed. Check the credential.', catalogTimeout: 'Catalog request timed out.', catalogTransport: 'Could not reach the catalog endpoint.', catalogInvalidResponse: 'The catalog response is invalid.', catalogTooLarge: 'The catalog response is too large.' })
     Object.assign(copy.ru, { retryOperation: 'Повторить ту же операцию', returnToEdit: 'Вернуться к редактированию', conflictPending: 'Подтвердить результат нельзя: настройки изменились. Вернитесь к редактированию и проверьте черновик перед сохранением.', diagnosticHttp: 'Ответ HTTP', diagnosticPayload: 'Данные запроса', diagnosticBeforeHttp: 'До ответа HTTP', diagnosticTimeout: 'Время ожидания истекло', diagnosticAbort: 'Отменено', diagnosticSseCompleted: 'Поток завершён', diagnosticSseFailed: 'Ошибка потока', diagnosticSseIncomplete: 'Поток не завершён', diagnosticStatus: 'Статус HTTP', diagnosticRequestId: 'ID запроса', diagnosticAt: 'Время', diagnosticToolCount: 'Число инструментов', catalogAuth: 'Ошибка авторизации каталога. Проверьте учётные данные.', catalogTimeout: 'Время ожидания каталога истекло.', catalogTransport: 'Не удалось подключиться к каталогу.', catalogInvalidResponse: 'Некорректный ответ каталога.', catalogTooLarge: 'Ответ каталога слишком велик.' })
     Object.assign(copy.zh, { retryOperation: '重试同一操作', returnToEdit: '返回编辑', conflictPending: '设置已更改，无法确认结果。请返回编辑并在保存前检查草稿。', diagnosticHttp: 'HTTP 响应', diagnosticPayload: '请求载荷', diagnosticBeforeHttp: 'HTTP 响应前', diagnosticTimeout: '超时', diagnosticAbort: '已取消', diagnosticSseCompleted: '流已完成', diagnosticSseFailed: '流失败', diagnosticSseIncomplete: '流未完成', diagnosticStatus: 'HTTP 状态', diagnosticRequestId: '请求 ID', diagnosticAt: '时间', diagnosticToolCount: '工具数量', catalogAuth: '目录身份验证失败，请检查凭据。', catalogTimeout: '目录请求超时。', catalogTransport: '无法连接目录地址。', catalogInvalidResponse: '目录响应无效。', catalogTooLarge: '目录响应过大。' })
+
+    Object.assign(copy.en, { protocol: 'Wire protocol', protocolHelp: 'How DSH talks to this gateway. It must match what the server exposes; the model catalog is read the same way for every protocol.', protocolResponses: 'OpenAI Responses', protocolCompletions: 'OpenAI Chat Completions', protocolAnthropic: 'Anthropic Messages', protocolGoogle: 'Google Generative AI' })
+    Object.assign(copy.ru, { protocol: 'Протокол обмена', protocolHelp: 'Как DSH обращается к шлюзу. Должен совпадать с тем, что предоставляет сервер; каталог моделей запрашивается одинаково для всех протоколов.', protocolResponses: 'OpenAI Responses', protocolCompletions: 'OpenAI Chat Completions', protocolAnthropic: 'Anthropic Messages', protocolGoogle: 'Google Generative AI' })
+    Object.assign(copy.zh, { protocol: '通信协议', protocolHelp: 'DSH 与该网关通信的方式，必须与服务端提供的协议一致；模型目录对所有协议使用同一地址。', protocolResponses: 'OpenAI Responses', protocolCompletions: 'OpenAI Chat Completions', protocolAnthropic: 'Anthropic Messages', protocolGoogle: 'Google Generative AI' })
 
     // The page body sits inside the Host's plugin page, which already draws the
     // title, the one-liner and the 960px column. This sheet only styles what the
@@ -268,6 +280,7 @@ window.__ModuleLoader__.load({
       const [reference, setReference] = useState('')
       const [reuse, setReuse] = useState(false)
       const [policy, setPolicy] = useState('{}')
+      const [protocol, setProtocol] = useState(PROTOCOLS[0])
       const [draft, setDraft] = useState({})
       const [models, setModels] = useState(null)
       const [search, setSearch] = useState('')
@@ -282,6 +295,7 @@ window.__ModuleLoader__.load({
         readState().then((value) => {
           if (!active) return
           setState(value); setBaseURL(value.baseURL || ''); setPolicy(JSON.stringify(value.policy || {}, null, 2)); setModels(value.models || [])
+          setProtocol(PROTOCOLS.includes(value.policy?.api) ? value.policy.api : PROTOCOLS[0])
         }).catch(() => { if (active) setFeedback(t('unavailable')) })
         return () => { active = false; requestGeneration.current += 1 }
       }, [])
@@ -341,6 +355,7 @@ window.__ModuleLoader__.load({
           validBaseURL(baseURL.trim(), { baseRequired: t('baseRequired'), baseInvalid: t('baseInvalid') })
           const parsedPolicy = JSON.parse(policy)
           if (!parsedPolicy || Array.isArray(parsedPolicy) || typeof parsedPolicy !== 'object') throw new Error(t('policyInvalid'))
+          parsedPolicy.api = protocol
           if (authType === 'replace' && !apiKey) throw new Error(t('keyRequired'))
           if (authType === 'reference' && !reference.trim()) throw new Error(t('referenceRequired'))
           const authEdit = authType === 'replace' ? { type: 'replace', key: apiKey } : authType === 'reference' ? { type: 'reference', ref: reference.trim(), allowEndpointReuse: reuse } : authType === 'keep' ? { type: 'keep', allowEndpointReuse: reuse } : { type: 'none' }
@@ -387,7 +402,7 @@ window.__ModuleLoader__.load({
             React.createElement('p', { className: 'cpa-status-text', role: 'status' }, state ? t(statusKeys[state.status] || 'statusError') : t('loading')),
           ),
           snapshot?.status === 'ready' && !snapshot.writable ? note(t('readOnly')) : null,
-          state?.activationError ? React.createElement('p', { className: 'cpa-note', 'data-tone': 'error', role: 'alert' }, t('activationFailed')) : null,
+          state?.activationError ? React.createElement('p', { className: 'cpa-note', 'data-tone': 'error', role: 'alert' }, t('activationFailed'), ' ', state.activationError.code, state.activationError.message ? ' — ' + state.activationError.message : '') : null,
           state?.catalog?.error ? note(t(Object.hasOwn(catalogErrorKeys, state.catalog.error.code) ? catalogErrorKeys[state.catalog.error.code] : 'catalogError'), 'warn') : null,
           (state?.diagnostics || []).map((diagnostic, index) => diagnosticView(diagnostic, index, t)),
           feedback ? note(feedback) : null,
@@ -409,10 +424,14 @@ window.__ModuleLoader__.load({
         ),
         React.createElement('form', { className: 'cpa-form', onSubmit: submit },
           section(t('connection'),
+            field(t('protocol'), React.createElement('span', { className: 'cpa-select-wrap' },
+              React.createElement('select', { className: 'cpa-select', name: 'protocol', value: protocol, disabled: !writable, onChange: (event) => setProtocol(event.currentTarget.value) }, PROTOCOLS.map((value) => React.createElement('option', { key: value, value }, t(protocolKeys[value])))),
+              React.createElement('span', { className: 'cpa-select-chevron', 'aria-hidden': 'true' }),
+            ), t('protocolHelp')),
             field(t('baseURL'), React.createElement(Input, { type: 'url', value: baseURL, disabled: !writable, onChange: (event) => { requestGeneration.current += 1; setBaseURL(event.currentTarget.value); setReuse(false); setApiKey('') } })),
             baseURL.trim().toLowerCase().startsWith('http:') ? React.createElement('p', { className: 'cpa-note', 'data-tone': 'warn', role: 'note' }, t('httpWarning')) : null,
             field(t('authAction'), React.createElement('span', { className: 'cpa-select-wrap' },
-              React.createElement('select', { className: 'cpa-select', value: authType, disabled: !writable, onChange: (event) => setAuthType(event.currentTarget.value) }, ['keep', 'replace', 'reference', 'none'].map((type) => React.createElement('option', { key: type, value: type }, t('auth' + type)))),
+              React.createElement('select', { className: 'cpa-select', name: 'authAction', value: authType, disabled: !writable, onChange: (event) => setAuthType(event.currentTarget.value) }, ['keep', 'replace', 'reference', 'none'].map((type) => React.createElement('option', { key: type, value: type }, t('auth' + type)))),
               React.createElement('span', { className: 'cpa-select-chevron', 'aria-hidden': 'true' }),
             )),
             authType === 'replace' ? field(t('apiKey'), React.createElement(Input, { type: 'password', value: apiKey, autoComplete: 'off', disabled: !writable || !state?.keyWritable, onChange: (event) => setApiKey(event.currentTarget.value) })) : null,

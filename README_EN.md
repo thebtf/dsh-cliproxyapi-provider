@@ -2,19 +2,19 @@
 
 English | [简体中文](./README.md)
 
-The plugin connects one CLIProxyAPI gateway to DeepSeek Harness using the OpenAI Responses API. Existing sessions retain their `CLIProxyAPI` provider and model IDs.
+The plugin connects one CLIProxyAPI gateway to DeepSeek Harness. You choose the wire protocol — OpenAI Responses (default), OpenAI Chat Completions, Anthropic Messages or Google Generative AI — and the plugin speaks it natively. Existing sessions retain their `CLIProxyAPI` provider and model IDs.
 
 ## Install and configure
 
 Requires Node.js 24.9.0 or newer and DeepSeek Harness 0.2.2-rc.2 (`engines.dsh` accepts the 0.2.x line, so a minor core update does not disable the plugin): Install the version tag or use the moving GitHub channel:
 
 ```powershell
-npx @deepseek-ai/dsh plugin --profile web add 'github:thebtf/dsh-cliproxyapi-provider#v0.4.0'
+npx @deepseek-ai/dsh plugin --profile web add 'github:thebtf/dsh-cliproxyapi-provider#v0.4.2'
 # Moving channel: github:thebtf/dsh-cliproxyapi-provider#latest
 npx @deepseek-ai/dsh web
 ```
 
-Restart the Web process or Desktop after installation or upgrade. On the sidebar **Plugins** page, choose **CLIProxyAPI**. Enter the actual Base URL; no local address is assumed. Choose whether to keep the existing credential, replace it, use a reference, or explicitly use no authentication. HTTP is unencrypted: keys and request contents can be exposed. Reusing an existing identity with a changed endpoint requires explicit consent.
+Restart the Web process or Desktop after installation or upgrade. On the sidebar **Plugins** page, choose **CLIProxyAPI**. Pick the wire protocol your gateway exposes, then enter the actual Base URL; no local address is assumed. The model catalog is read from the same `/models` endpoint for every protocol. Choose whether to keep the existing credential, replace it, use a reference, or explicitly use no authentication. HTTP is unencrypted: keys and request contents can be exposed. Reusing an existing identity with a changed endpoint requires explicit consent.
 
 Preview the catalog, search, and select models; bulk controls affect the whole loaded catalog. Save commits the address, authentication action, policy, and model draft together. Saving zero models is allowed but leaves the native route unavailable. Absent model choices are retained and newly discovered models default to enabled. Metadata, capability sources and reported reasoning efforts are available in model details. A failed refresh preserves the last good catalog as stale. A saved configuration is not proof of successful activation.
 
@@ -22,7 +22,7 @@ Preview the catalog, search, and select models; bulk controls affect the whole l
 
 ## Migration and rollback
 
-An existing generic CLIProxyAPI profile continues to own its route until an explicit legacy import. Use **Import legacy connection** in the CPA page and inspect any migration or recovery error; ambiguous ownership, missing addresses, and unsupported fields need repair rather than silent replacement. A brief interruption during cutover is possible. Do not restore an old backup over newer settings: use the migration recovery/rollback path only when its ownership and revision checks permit it, or repair forward. Keep a backup before upgrading and restart after changing versions.
+An existing generic CLIProxyAPI profile owns its route until the plugin takes it over. Saving the first connection adopts that profile automatically: the plugin records a full backup, removes the legacy entry and finishes the cutover on the first successful catalog refresh. **Import legacy connection** remains available for an explicit import. Ambiguous ownership, missing addresses, and unsupported fields are reported instead of silently replaced. A brief interruption during cutover is possible. Do not restore an old backup over newer settings: use the migration recovery/rollback path only when its ownership and revision checks permit it, or repair forward. Keep a backup before upgrading and restart after changing versions.
 
 ## Models integration
 

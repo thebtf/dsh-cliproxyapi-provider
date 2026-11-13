@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { ConnectionError, resolveIdentity, saveConnection, validateEndpoint } from './connection.js'
 import { readCatalogCache, writeCatalogCache } from './catalog-store.js'
-import { legacyView, prepareLegacy, cutoverLegacy, finishLegacy, rollbackLegacy } from './migration.js'
+import { legacyView, prepareLegacy, cutoverLegacy, finishLegacy, rollbackLegacy, discardPrepared } from './migration.js'
 import { createGatewayAdapter } from './adapter.js'
 import { validatePolicy } from './policy.js'
 import { credentialField } from './secrets.js'
@@ -214,10 +214,33 @@ export function installGateway(ctx, config, discover, readJson, previewKey) {
     if (input.type === 'refresh-models') { await refresh(input.connectionGeneration, signal); return view() }
     if (input.type === 'save-connection') {
       validatePolicy(input.policy === undefined ? current().policy ?? {} : input.policy)
-      const legacy = ctx.settings.describe().find((row) => row.ns === 'llm-pi-ai')?.value?.providers?.[PROVIDER]
-      if (legacy && !current().baseURL) throw new ConnectionError('LEGACY_CONFLICT', 'Import or resolve the existing CPA provider first')
+      // A legacy llm-pi-ai provider owns the same route. Adopt it instead of
+      // refusing the save: prepareLegacy records a full backup, so the cutover
+      // stays reversible through rollback-legacy. The cutover runs only after the
+      // save itself succeeded, so a rejected draft leaves the legacy route intact.
+      let save = input
+      let adopted = false
+      if (!current().baseURL) {
+        const summary = legacyView(ctx.settings)
+        if (summary.available) {
+          await prepareLegacy(ctx.settings, { expectedRevision: descriptor().revision, expectedLegacyRevision: summary.revision, fingerprint: summary.fingerprint, operationId: input.operationId + ':adopt' })
+          save = { ...input, expectedRevision: descriptor().revision }
+          adopted = true
+        } else if (ctx.settings.describe().find((row) => row.ns === 'llm-pi-ai')?.value?.providers?.[PROVIDER]) {
+          throw new ConnectionError('LEGACY_CONFLICT', summary.reason ?? 'The existing CPA provider must be resolved first')
+        }
+      }
       const previous = current()
-      await saveConnection(ctx.settings, ctx.credentials, input)
+      try {
+        await saveConnection(ctx.settings, ctx.credentials, save)
+      } catch (error) {
+        // The prepared migration already wrote our row. A definite rejection is
+        // undone so the legacy route keeps working; an ambiguous outcome is left
+        // for rollback-legacy, because discarding could erase a real save.
+        if (adopted && error?.code !== 'UNKNOWN') { try { await discardPrepared(ctx.settings) } catch { } }
+        throw error
+      }
+      if (adopted) await cutoverLegacy(ctx.settings)
       const value = current()
       if (previous.generation !== value.generation) { cancelWake(); abortRefreshes(); failures = 0; catalog = undefined; freshness = 'empty'; catalogError = undefined }
       try { await refresh(value.generation, signal) } catch { await activate() }
@@ -284,6 +307,10 @@ export function installGateway(ctx, config, discover, readJson, previewKey) {
   ctx.on('settings/document-updated', (ns) => { if (ns === NS) { const value = current(); if (value.enabled === false || value.authIdentity?.type === 'missing') { cancelWake(); abortRefreshes() } void activate().catch(() => { }) } })
   ctx.effect(() => () => { stopped = true; cancelWake(); abortRefreshes(); registration?.() })
   void (async () => {
+    // A prepared migration means the process stopped between writing our row and
+    // removing the legacy provider. Completing the cutover is the only forward
+    // path; leaving it prepared would keep the route deactivated forever.
+    if (current().migration?.phase === 'prepared') { try { await cutoverLegacy(ctx.settings) } catch { } }
     if (current().migration?.phase === 'cutover') await cutoverLegacy(ctx.settings)
     if (current().migration?.phase === 'rollback') await rollbackLegacy(ctx.settings, async () => { registration?.replace([]) })
     await load()

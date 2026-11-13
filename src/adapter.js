@@ -3,6 +3,7 @@ import { LlmError, resolveImageAttachmentAccess, resolveRetryPolicy } from '@dee
 import { createProvider, InMemoryCredentialStore, defaultProviderAuthContext } from '@earendil-works/pi-ai'
 import { createTransport } from './transport.js'
 import { resolveIdentity } from './connection.js'
+import { protocolOf } from './policy.js'
 
 const PROVIDER = 'CLIProxyAPI'
 const LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
@@ -11,11 +12,12 @@ export function createGatewayAdapter(ctx, snapshot, diagnostics, onMissing = () 
   let profiles = new Map()
   const update = (next) => {
     const captured = structuredClone(next)
+    const protocol = protocolOf(captured.policy)
     const models = captured.models.filter((model) => captured.modelSelection?.[model.id] !== false).map((model) => {
       const efforts = model.reasoningEfforts
       const thinkingLevelMap = efforts && Object.fromEntries(LEVELS.flatMap((level) => efforts[level] === undefined ? [[level, null]] : efforts[level] === null ? [] : [[level, efforts[level]]]))
       return {
-        id: model.id, name: model.name ?? model.id, provider: PROVIDER, api: 'openai-responses',
+        id: model.id, name: model.name ?? model.id, provider: PROVIDER, api: protocol,
         baseUrl: captured.baseURL, reasoning: !!efforts, ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
         input: model.inputModalities ?? model.input ?? ['text'], contextWindow: model.contextWindow,
         maxTokens: model.maxTokens, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -25,10 +27,10 @@ export function createGatewayAdapter(ctx, snapshot, diagnostics, onMissing = () 
     const piProvider = createProvider({
       id: PROVIDER, name: PROVIDER, baseUrl: captured.baseURL, models,
       auth: { apiKey: { name: 'DSH key resolver', resolve: async ({ credential }) => ({ auth: { apiKey: credential?.key ?? 'cpa-keyless' }, source: 'DSH' }) } },
-      api: createTransport(captured.baseURL, diagnostics, globalThis.fetch, captured.authIdentity?.type === 'none'),
+      api: createTransport(protocol, captured.baseURL, diagnostics, globalThis.fetch, captured.authIdentity?.type === 'none'),
     })
     const profile = {
-      provider: PROVIDER, displayName: PROVIDER, baseURL: captured.baseURL, piProvider,
+      provider: PROVIDER, displayName: PROVIDER, baseURL: captured.baseURL, piProvider, api: protocol,
       authIdentity: captured.authIdentity, headers: captured.policy?.headers,
       reasoning: captured.policy?.reasoning, thinkingBudgets: captured.policy?.thinkingBudgets,
       cacheRetention: captured.policy?.cacheRetention, transport: captured.policy?.transport,

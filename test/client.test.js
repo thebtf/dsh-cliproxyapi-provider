@@ -38,17 +38,18 @@ async function harness(initial = state()) {
   render(); effects.splice(0).forEach((effect) => effect()); await new Promise((resolve) => setTimeout(resolve, 0))
   const button = (tree, label) => find(tree, (node) => node.type === 'button' && text(node) === label)[0]
   const input = (tree, type) => find(tree, (node) => node.type === 'input' && node.props.type === type)[0]
-  return { calls, render, button, input, registrations, dictionaries, get opened() { return opened }, setReply(value) { reply = value }, setCurrent(value) { current = value } }
+  const select = (tree, name) => find(tree, (node) => node.type === 'select' && node.props.name === name)[0]
+  return { calls, render, button, input, select, registrations, dictionaries, get opened() { return opened }, setReply(value) { reply = value }, setCurrent(value) { current = value } }
 }
 
 test('combined save includes CAS, credential action, policy and zero-model selection', async () => {
   const h = await harness(); let tree = h.render()
   h.button(tree, 'deselectAll').props.onClick(); tree = h.render()
-  find(tree, (n) => n.type === 'select')[0].props.onChange({ currentTarget: { value: 'replace' } }); tree = h.render()
+  h.select(tree, 'authAction').props.onChange({ currentTarget: { value: 'replace' } }); tree = h.render()
   h.input(tree, 'password').props.onChange({ currentTarget: { value: 'new-key' } }); tree = h.render()
   await find(tree, (n) => n.type === 'form')[0].props.onSubmit({ preventDefault() { } })
   assert.equal(h.calls.length, 1)
-  assert.deepEqual({ ...h.calls[0], operationId: '<id>' }, { type: 'save-connection', expectedRevision: 7, operationId: '<id>', baseURL: 'https://old.example/v1', authEdit: { type: 'replace', key: 'new-key' }, policy: { timeout: 12 }, selectionChanges: { one: false, two: false } })
+  assert.deepEqual({ ...h.calls[0], operationId: '<id>' }, { type: 'save-connection', expectedRevision: 7, operationId: '<id>', baseURL: 'https://old.example/v1', authEdit: { type: 'replace', key: 'new-key' }, policy: { timeout: 12, api: 'openai-responses' }, selectionChanges: { one: false, two: false } })
   assert.ok(h.calls[0].operationId)
 })
 
@@ -132,7 +133,7 @@ test('package locale metadata points to each translated detail', async () => {
 test('lost save retries the identical in-memory command and reconciles a committed readback', async () => {
   const h = await harness(); let tree = h.render()
   h.button(tree, 'deselectAll').props.onClick(); tree = h.render()
-  find(tree, (n) => n.type === 'select')[0].props.onChange({ currentTarget: { value: 'replace' } }); tree = h.render()
+  h.select(tree, 'authAction').props.onChange({ currentTarget: { value: 'replace' } }); tree = h.render()
   h.input(tree, 'password').props.onChange({ currentTarget: { value: 'private-key' } }); tree = h.render()
   h.setReply(() => { throw new Error('network lost before delivery') })
   await find(tree, (n) => n.type === 'form')[0].props.onSubmit({ preventDefault() { } })
@@ -190,7 +191,7 @@ test('structured diagnostics and catalog codes are localized without rendering u
 
 test('changing endpoint after returning to edit clears a replacement key', async () => {
   const h = await harness(); let tree = h.render()
-  find(tree, (n) => n.type === 'select')[0].props.onChange({ currentTarget: { value: 'replace' } }); tree = h.render()
+  h.select(tree, 'authAction').props.onChange({ currentTarget: { value: 'replace' } }); tree = h.render()
   h.input(tree, 'password').props.onChange({ currentTarget: { value: 'private-key' } }); tree = h.render()
   h.setReply(() => { throw new Error('lost') })
   await find(tree, (n) => n.type === 'form')[0].props.onSubmit({ preventDefault() { } }); tree = h.render()
