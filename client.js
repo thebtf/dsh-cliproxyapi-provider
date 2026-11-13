@@ -9,22 +9,12 @@ window.__ModuleLoader__.load({
     const { Button, Input, Checkbox, Tag } = require('@deepseek-ai/dsh-client-ui-primitives')
     const { useEffect, useState } = React
 
-    const PI_NS = 'llm-pi-ai'
-    // The built-in pi-ai discovery cannot parse CLIProxyAPI's Codex models array.
-    // Use our own catalog discovery; the server synchronizes its rich capabilities
-    // (including reasoningEfforts) after the browser saves the bootstrap profile.
     const DISCOVERY_NS = 'llm-cliproxyapi'
-    const CREDENTIAL_REF = 'DSH_CLIPROXY_API_KEY'
-    const PROVIDER = 'CLIProxyAPI'
-    const DEFAULT_BASE_URL = 'http://127.0.0.1:8317/v1'
-    const PROFILE_SYNC_HEADER = 'x-dsh-provider-cpa-sync'
-    const PROFILE_SYNC_TIMEOUT_MS = 30000
-    const PLACEHOLDER_AUTHORIZATION = 'Bearer dsh-cliproxyapi-no-key'
     const SETTINGS_SLOT = 'plugins.item'
     const SETTINGS_TAB_ID = 'cliproxyapi'
     const SETTINGS_LOCALE_NS = 'settings.cliProxyApi'
     const SETTINGS_SUMMARY_NS = 'llm-cliproxyapi'
-    const inject = ['slots', 'locale', 'remote', 'remote.credentials', 'configForms']
+    const inject = ['slots', 'locale', 'configForms', 'pluginNavigation']
 
     const copy = {
       en: {
@@ -100,6 +90,18 @@ window.__ModuleLoader__.load({
         efforts: '推理等级', defaultEffort: '默认等级', description: '描述', empty: '空', effortUnknown: '未提供推理等级',
       },
     }
+    Object.assign(copy.en, { save: 'Save', saved: 'Changes saved.', statusNotConfigured: 'Not configured.', statusDisabled: 'Connection disabled.', statusMissingKey: 'Credential is missing.', statusLoading: 'Loading catalog…', statusReady: 'Ready.', statusStale: 'Catalog is stale.', statusReconfiguring: 'Reconfiguring…', statusNoModels: 'No selected usable models; the connection is not ready.', statusError: 'Connection error.', activationFailed: 'Saved, but activation failed. The connection is not ready.', catalogError: 'Catalog refresh failed; the last good catalog may be stale.', uncertain: 'The result is unknown. Your draft is preserved; check the operation before trying again.', conflict: 'Settings changed elsewhere. Your draft is preserved; review it before saving again.', operationId: 'Operation ID', reconcile: 'Check operation', authAction: 'Authentication action', authkeep: 'Keep current identity', authreplace: 'Replace with a key', authreference: 'Use a credential reference', authnone: 'No authentication', reference: 'Credential reference', keyRequired: 'Enter a key.', referenceRequired: 'Enter a credential reference.', reuseConsent: 'Allow the saved identity to be used with this endpoint', reuseRequired: 'Explicitly allow credential reuse before previewing this endpoint.', httpWarning: 'HTTP is not encrypted; credentials and requests can be exposed.', policy: 'Connection policy (JSON object)', policyInvalid: 'Enter a valid policy JSON object.', refresh: 'Refresh saved catalog', saveSelection: 'Save model selection only', disconnect: 'Disable connection', enableConnection: 'Enable connection', disconnectHelp: 'Disabling preserves the endpoint, key and model selection; existing sessions may fail until re-enabled.', forgetKey: 'Forget key', forgetHelp: 'Forgetting the key can make the connection unavailable; it does not select keyless authentication.', importLegacy: 'Import legacy connection', openSettings: 'Open Plugins, then select CLIProxyAPI', sourceOverride: 'override' })
+    Object.assign(copy.zh, { save: '保存', saved: '更改已保存。', statusNotConfigured: '尚未配置。', statusDisabled: '连接已停用。', statusMissingKey: '缺少凭据。', statusLoading: '正在加载目录…', statusReady: '已就绪。', statusStale: '目录已过期。', statusReconfiguring: '正在重新配置…', statusNoModels: '没有已选可用模型；连接尚未就绪。', statusError: '连接错误。', activationFailed: '已保存，但激活失败。连接尚未就绪。', catalogError: '目录刷新失败；上次成功的目录可能已过期。', uncertain: '结果未知。草稿已保留；重试前请检查操作。', conflict: '设置已在其他位置更改。草稿已保留；保存前请检查。', operationId: '操作 ID', reconcile: '检查操作', authAction: '身份验证操作', authkeep: '保留当前身份', authreplace: '替换为密钥', authreference: '使用凭据引用', authnone: '不使用身份验证', reference: '凭据引用', keyRequired: '请输入密钥。', referenceRequired: '请输入凭据引用。', reuseConsent: '允许在此地址使用已保存的身份', reuseRequired: '预览此地址前请明确允许重用凭据。', httpWarning: 'HTTP 未加密，凭据和请求可能泄露。', policy: '连接策略（JSON 对象）', policyInvalid: '请输入有效的策略 JSON 对象。', refresh: '刷新已保存的目录', saveSelection: '仅保存模型选择', disconnect: '停用连接', enableConnection: '启用连接', disconnectHelp: '停用会保留地址、密钥和模型选择；重新启用前现有会话可能失败。', forgetKey: '忘记密钥', forgetHelp: '忘记密钥可能导致连接不可用；不会自动选择无验证模式。', importLegacy: '导入旧连接', openSettings: '打开插件，然后选择 CLIProxyAPI', sourceOverride: '用户覆盖' })
+    copy.ru = { title: 'CLIProxyAPI', intro: 'Подключение сервера CLIProxyAPI и выбор моделей.', loading: 'Загрузка настроек…', unavailable: 'Настройки недоступны.', readOnly: 'Настройки доступны только для чтения.', baseURL: 'Адрес сервера', apiKey: 'Ключ API', baseRequired: 'Укажите адрес.', baseInvalid: 'Укажите корректный HTTP или HTTPS адрес.', save: 'Сохранить', saved: 'Изменения сохранены.', loadModels: 'Предпросмотр моделей', loadFailed: 'Не удалось загрузить каталог.', modelsHelp: 'Отключённые модели недоступны в DSH; существующие сессии могут завершиться ошибкой. Прямые вызовы CPA не блокируются. Новые модели включены по умолчанию.', search: 'Поиск по имени или ID', selectedCount: 'выбрано из', selectAll: 'Выбрать все модели', deselectAll: 'Снять выбор со всех', noMatches: 'Модели не найдены.', enabled: 'Включить', details: 'Сведения о модели', rawDetails: 'Все поля CPA', context: 'Контекст', output: 'Максимальный вывод', modalities: 'Типы входа', sourceDefault: 'по умолчанию', sourceCPA: 'CPA', sourceOverride: 'переопределение', efforts: 'Уровни рассуждения', defaultEffort: 'Уровень по умолчанию', description: 'Описание', empty: 'Пусто', effortUnknown: 'Уровни рассуждения не указаны', statusNotConfigured: 'Не настроено.', statusDisabled: 'Подключение отключено.', statusMissingKey: 'Нет учётных данных.', statusLoading: 'Загрузка каталога…', statusReady: 'Готово.', statusStale: 'Каталог устарел.', statusReconfiguring: 'Применение настроек…', statusNoModels: 'Нет выбранных доступных моделей; подключение не готово.', statusError: 'Ошибка подключения.', activationFailed: 'Сохранено, но активация не удалась. Подключение не готово.', catalogError: 'Обновить каталог не удалось; предыдущая копия может устареть.', uncertain: 'Результат неизвестен. Черновик сохранён; проверьте операцию перед повтором.', conflict: 'Настройки изменены в другом месте. Черновик сохранён; проверьте его.', operationId: 'ID операции', reconcile: 'Проверить операцию', authAction: 'Авторизация', authkeep: 'Оставить текущие данные', authreplace: 'Заменить ключ', authreference: 'Использовать ссылку на данные', authnone: 'Без авторизации', reference: 'Ссылка на учётные данные', keyRequired: 'Укажите ключ.', referenceRequired: 'Укажите ссылку.', reuseConsent: 'Разрешить использовать сохранённые данные с этим адресом', reuseRequired: 'Для предпросмотра явно разрешите повторное использование данных.', httpWarning: 'HTTP не шифруется: ключ и запросы могут быть раскрыты.', policy: 'Политика подключения (объект JSON)', policyInvalid: 'Укажите корректный объект JSON.', refresh: 'Обновить сохранённый каталог', saveSelection: 'Сохранить только выбор моделей', disconnect: 'Отключить подключение', enableConnection: 'Включить подключение', disconnectHelp: 'Отключение сохраняет адрес, ключ и выбор моделей; существующие сессии могут перестать работать.', forgetKey: 'Забыть ключ', forgetHelp: 'Удаление ключа может сделать подключение недоступным и не включает режим без авторизации.', importLegacy: 'Импортировать прежнее подключение', openSettings: 'Открыть Plugins и выбрать CLIProxyAPI' }
+    Object.assign(copy.en, { openSettings: 'Open Plugins', chooseCPA: 'Then select CLIProxyAPI.', saveFailed: 'The operation was refused. Your draft is preserved.', revision: 'Readback revision' })
+    Object.assign(copy.ru, { openSettings: 'Открыть плагины', chooseCPA: 'Затем выберите CLIProxyAPI.', saveFailed: 'Операция отклонена. Черновик сохранён.', revision: 'Прочитанная версия' })
+    Object.assign(copy.zh, { openSettings: '打开插件', chooseCPA: '然后选择 CLIProxyAPI。', saveFailed: '操作被拒绝，草稿已保留。', revision: '读取的版本' })
+    Object.assign(copy.en, { previewNone: 'Save keyless authentication before previewing without the saved credential.' })
+    Object.assign(copy.ru, { previewNone: 'Чтобы выполнить предпросмотр без сохранённого ключа, сначала сохраните режим без авторизации.' })
+    Object.assign(copy.zh, { previewNone: '请先保存无验证模式，再预览不使用已保存凭据的目录。' })
+    Object.assign(copy.en, { retryOperation: 'Retry the same operation', returnToEdit: 'Return to editing', conflictPending: 'The result cannot be confirmed because settings changed. Return to editing and review your draft before saving.', diagnosticHttp: 'HTTP response', diagnosticPayload: 'Request payload', diagnosticBeforeHttp: 'Before HTTP response', diagnosticTimeout: 'Timeout', diagnosticAbort: 'Cancelled', diagnosticSseCompleted: 'Stream completed', diagnosticSseFailed: 'Stream failed', diagnosticSseIncomplete: 'Stream incomplete', diagnosticStatus: 'HTTP status', diagnosticRequestId: 'Request ID', diagnosticAt: 'Time', diagnosticToolCount: 'Tool count', catalogAuth: 'Catalog authentication failed. Check the credential.', catalogTimeout: 'Catalog request timed out.', catalogTransport: 'Could not reach the catalog endpoint.', catalogInvalidResponse: 'The catalog response is invalid.', catalogTooLarge: 'The catalog response is too large.' })
+    Object.assign(copy.ru, { retryOperation: 'Повторить ту же операцию', returnToEdit: 'Вернуться к редактированию', conflictPending: 'Подтвердить результат нельзя: настройки изменились. Вернитесь к редактированию и проверьте черновик перед сохранением.', diagnosticHttp: 'Ответ HTTP', diagnosticPayload: 'Данные запроса', diagnosticBeforeHttp: 'До ответа HTTP', diagnosticTimeout: 'Время ожидания истекло', diagnosticAbort: 'Отменено', diagnosticSseCompleted: 'Поток завершён', diagnosticSseFailed: 'Ошибка потока', diagnosticSseIncomplete: 'Поток не завершён', diagnosticStatus: 'Статус HTTP', diagnosticRequestId: 'ID запроса', diagnosticAt: 'Время', diagnosticToolCount: 'Число инструментов', catalogAuth: 'Ошибка авторизации каталога. Проверьте учётные данные.', catalogTimeout: 'Время ожидания каталога истекло.', catalogTransport: 'Не удалось подключиться к каталогу.', catalogInvalidResponse: 'Некорректный ответ каталога.', catalogTooLarge: 'Ответ каталога слишком велик.' })
+    Object.assign(copy.zh, { retryOperation: '重试同一操作', returnToEdit: '返回编辑', conflictPending: '设置已更改，无法确认结果。请返回编辑并在保存前检查草稿。', diagnosticHttp: 'HTTP 响应', diagnosticPayload: '请求载荷', diagnosticBeforeHttp: 'HTTP 响应前', diagnosticTimeout: '超时', diagnosticAbort: '已取消', diagnosticSseCompleted: '流已完成', diagnosticSseFailed: '流失败', diagnosticSseIncomplete: '流未完成', diagnosticStatus: 'HTTP 状态', diagnosticRequestId: '请求 ID', diagnosticAt: '时间', diagnosticToolCount: '工具数量', catalogAuth: '目录身份验证失败，请检查凭据。', catalogTimeout: '目录请求超时。', catalogTransport: '无法连接目录地址。', catalogInvalidResponse: '目录响应无效。', catalogTooLarge: '目录响应过大。' })
 
     const styles = {
       section: { boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px', width: '100%', minWidth: 0, maxWidth: '720px', padding: '24px 16px 40px', margin: '0 auto', color: 'var(--dsw-alias-label-primary)' },
@@ -137,180 +139,26 @@ window.__ModuleLoader__.load({
       if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error(messages.baseInvalid)
     }
 
-    function createSyncToken() {
-      return globalThis.crypto?.randomUUID?.()
-        || String(Date.now()) + '-' + Math.random().toString(36).slice(2)
+    function createOperationId() {
+      return globalThis.crypto?.randomUUID?.() || String(Date.now()) + '-' + Math.random().toString(36).slice(2)
     }
 
-    function bootstrapProfileOf(baseURL, models, hasCredential, syncToken, previous = {}) {
-      const headers = { ...previous.headers }
-      for (const key of Object.keys(headers)) {
-        if (key.toLowerCase() === PROFILE_SYNC_HEADER || (key.toLowerCase() === 'authorization' && headers[key] === PLACEHOLDER_AUTHORIZATION)) delete headers[key]
-      }
-      headers[PROFILE_SYNC_HEADER] = 'rich:' + syncToken
-      if (!hasCredential && !Object.keys(headers).some((key) => key.toLowerCase() === 'authorization')) headers.authorization = PLACEHOLDER_AUTHORIZATION
-      const { apiKeyEnv: _previousApiKeyEnv, modelOverrides: _previousModelOverrides, ...rest } = previous
-      return {
-        ...rest,
-        displayName: PROVIDER,
-        api: 'openai-responses',
-        baseURL,
-        compat: { ...previous.compat, supportsStrictMode: true },
-        models: models.map((model) => ({
-          id: model.id,
-          name: model.name || model.id,
-          contextWindow: model.contextWindow || 262144,
-          maxTokens: model.maxTokens || 32768,
-          input: Array.isArray(model.inputModalities) && model.inputModalities.length
-            ? [...model.inputModalities]
-            : ['text'],
-          ...(model.reasoningEfforts ? { reasoningEfforts: { ...model.reasoningEfforts } } : {}),
-        })),
-        defaultContextWindow: previous.defaultContextWindow ?? 262144,
-        defaultMaxTokens: previous.defaultMaxTokens ?? 32768,
-        defaultInput: previous.defaultInput ?? ['text'],
-        headers,
-        ...(hasCredential ? { apiKeyEnv: CREDENTIAL_REF } : {}),
-      }
-    }
-
-    function comparableProfile(profile, credentialChanged) {
-      if (!profile) return profile
-      const { models: _models, ...rest } = profile
-      const headers = { ...rest.headers }
-      for (const key of Object.keys(headers)) {
-        if (key.toLowerCase() === PROFILE_SYNC_HEADER || (credentialChanged && key.toLowerCase() === 'authorization' && headers[key] === PLACEHOLDER_AUTHORIZATION)) delete headers[key]
-      }
-      if (credentialChanged) delete rest.apiKeyEnv
-      return { ...rest, headers }
-    }
-
-    function stableJson(value) {
-      if (Array.isArray(value)) return value.map(stableJson)
-      if (!value || typeof value !== 'object') return value
-      return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableJson(value[key])]))
-    }
-
-    function sameProfile(left, right, credentialChanged) {
-      if (credentialChanged && left?.apiKeyEnv !== right?.apiKeyEnv && left?.apiKeyEnv !== CREDENTIAL_REF) return false
-      return JSON.stringify(stableJson(comparableProfile(left, credentialChanged))) === JSON.stringify(stableJson(comparableProfile(right, credentialChanged)))
-    }
-
-    function syncValueOf(headers) {
-      const key = Object.keys(headers || {}).find((candidate) => candidate.toLowerCase() === PROFILE_SYNC_HEADER)
-      return key === undefined ? undefined : String(headers[key])
-    }
-
-    function waitForProfileSynchronization(scope, baseURL, previousRevision, enabled, hasCredential, messages) {
-      return new Promise((resolve, reject) => {
-        let finished = false
-        let dispose = () => { }
-        let timeout
-        const finish = (error) => {
-          if (finished) return
-          finished = true
-          clearTimeout(timeout)
-          dispose()
-          if (error) reject(error)
-          else resolve()
-        }
-        const inspect = () => {
-          const snapshot = scope.getSnapshot()
-          if (snapshot?.status !== 'ready') return
-          if (Number.isInteger(previousRevision) && (!Number.isInteger(snapshot.revision) || snapshot.revision <= previousRevision)) return
-          const profile = snapshot.value?.providers?.[PROVIDER]
-          const actualIds = profile?.models?.map((model) => model.id).sort()
-          const expectedIds = enabled.map((model) => model.id).sort()
-          if (profile?.baseURL === baseURL && syncValueOf(profile.headers) === undefined &&
-            JSON.stringify(actualIds) === JSON.stringify(expectedIds) &&
-            (hasCredential ? profile.apiKeyEnv === CREDENTIAL_REF : profile.apiKeyEnv === undefined)) finish()
-        }
-        dispose = scope.subscribe(inspect)
-        timeout = setTimeout(() => finish(new Error(messages.syncTimeout)), PROFILE_SYNC_TIMEOUT_MS)
-        inspect()
-      })
-    }
-
-    async function credentialStatusOf(remote) {
-      try {
-        const response = await remote.credentials.describe([CREDENTIAL_REF])
-        if (!response.ok) return 'unknown'
-        return response.value[CREDENTIAL_REF]?.configured === true ? 'configured' : 'missing'
-      } catch {
-        return 'unknown'
-      }
-    }
-
-    async function discoverModels(baseURL, apiKey, messages) {
-      let discovery
-      try {
-        const transportFetch = window.__DSH_TRANSPORT__?.fetch || globalThis.fetch
-        const response = await transportFetch('/api/cliproxyapi/catalog', {
-          method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', cache: 'no-store',
-          body: JSON.stringify({ baseURL, ...(apiKey ? { apiKey } : {}) }),
-        })
-        if (!response.ok) throw new Error(messages.loadFailed)
-        discovery = await response.json()
-      } catch {
-        throw new Error(messages.loadFailed)
-      }
-      if (!discovery.ok) throw new Error(messages.loadFailed)
-      if (!discovery.value.length) throw new Error(messages.noModels)
-      return discovery.value
-    }
-
-    async function installInitialProfile(remote, scope, selectionScope, baseURL, apiKey, draft, messages) {
-      const initialSnapshot = scope.getSnapshot()
-      if (initialSnapshot?.status !== 'ready' || !initialSnapshot.writable || !Number.isInteger(initialSnapshot.revision)) throw new Error(messages.saveFailed)
-      const originalProfile = initialSnapshot.value?.providers?.[PROVIDER]
-      const models = await discoverModels(baseURL, apiKey, messages)
-      const selectionSnapshot = selectionScope.getSnapshot()
-      if (selectionSnapshot?.status !== 'ready' || !selectionSnapshot.writable) throw new Error(messages.selectionUnavailable)
-      const selection = { ...(selectionSnapshot.value?.modelSelection || {}), ...draft }
-      const enabled = models.filter((model) => selection[model.id] !== false)
-      if (!enabled.length) throw new Error(messages.needOneModel)
-
-      const credential = await remote.credentials.describe([CREDENTIAL_REF])
-      if (!credential.ok) throw new Error(messages.saveFailed)
-      const configured = credential.ok && credential.value[CREDENTIAL_REF]?.configured === true
-      let writesStarted = false
-      try {
-        if (Object.keys(draft).length) {
-          writesStarted = true
-          const selected = await selectionScope.mutate([{ op: 'set', path: ['modelSelection'], value: selection }], selectionSnapshot.revision)
-          if (!selected) throw new Error(messages.partialSave)
-        }
-        if (apiKey) {
-          writesStarted = true
-          const saved = await remote.credentials.set(CREDENTIAL_REF, apiKey)
-          if (!saved.ok) throw new Error(messages.partialSave)
-        }
-        let profileSnapshot = scope.getSnapshot()
-        if (profileSnapshot?.status !== 'ready' || !profileSnapshot.writable || !Number.isInteger(profileSnapshot.revision)) throw new Error(messages.partialSave)
-        if (!sameProfile(profileSnapshot.value?.providers?.[PROVIDER], originalProfile, Boolean(apiKey))) throw new Error(messages.partialSave)
-        let previousRevision
-        let saved = false
-        for (let attempt = 0; attempt < 3; attempt += 1) {
-          previousRevision = profileSnapshot.revision
-          writesStarted = true
-          saved = await scope.mutate([{
-            op: 'set',
-            path: ['providers', PROVIDER],
-            value: bootstrapProfileOf(baseURL, enabled, Boolean(apiKey || configured), createSyncToken(), profileSnapshot.value?.providers?.[PROVIDER]),
-          }], previousRevision)
-          if (saved) break
-          const refreshed = scope.getSnapshot()
-          if (refreshed?.status !== 'ready' || !refreshed.writable || !Number.isInteger(refreshed.revision) || refreshed.revision <= previousRevision ||
-            !sameProfile(refreshed.value?.providers?.[PROVIDER], originalProfile, Boolean(apiKey))) break
-          profileSnapshot = refreshed
-        }
-        if (!saved) throw new Error(messages.partialSave)
-        await waitForProfileSynchronization(scope, baseURL, previousRevision, enabled, Boolean(apiKey || configured), messages)
-      } catch (error) {
-        if (writesStarted) throw new Error(messages.partialSave, { cause: error })
+    async function request(path, body) {
+      const transportFetch = window.__DSH_TRANSPORT__?.fetch || globalThis.fetch
+      const response = await transportFetch(path, body === undefined
+        ? { credentials: 'same-origin', cache: 'no-store' }
+        : { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', cache: 'no-store', body: JSON.stringify(body) })
+      const result = await response.json()
+      if (!result?.ok) {
+        const error = new Error('gateway')
+        error.code = result?.error?.code
         throw error
       }
+      return result.value
     }
+
+    const readState = () => request('/api/cliproxyapi/state')
+    const command = (body) => request('/api/cliproxyapi/command', body)
     function metadataValue(value, t) {
       if (value !== null && typeof value === 'object') {
         const entries = Object.entries(value)
@@ -335,13 +183,13 @@ window.__ModuleLoader__.load({
       return React.createElement('div', { style: styles.efforts },
         React.createElement('span', { style: styles.status }, efforts.length ? t('efforts') + ':' : t('effortUnknown')),
         efforts.map((effort) => React.createElement(Tag, { key: effort, tone: effort === raw.default_reasoning_level ? 'info' : 'neutral' }, effort)),
-        typeof raw.default_reasoning_level === 'string' ? React.createElement('span', { style: styles.status }, t('defaultEffort') + ': ' + raw.default_reasoning_level) : null,
+        typeof (model.defaultReasoningEffort || raw.default_reasoning_level) === 'string' ? React.createElement('span', { style: styles.status }, t('defaultEffort') + ': ' + (model.defaultReasoningEffort || raw.default_reasoning_level)) : null,
       )
     }
 
     function modelDetails(model, t) {
       const raw = model.catalogMetadata && typeof model.catalogMetadata === 'object' ? model.catalogMetadata : {}
-      const source = (key) => model.catalogSources?.[key] === 'default' ? t('sourceDefault') : model.catalogSources?.[key] === 'cpa' ? t('sourceCPA') : ''
+      const source = (key) => model.catalogSources?.[key] === 'default' ? t('sourceDefault') : model.catalogSources?.[key] === 'cpa' ? t('sourceCPA') : model.catalogSources?.[key] === 'override' ? t('sourceOverride') : ''
       const line = (label, value, provenance) => value === undefined || value === null ? null : React.createElement('p', { style: styles.status }, label, ': ', String(value), provenance ? ' (' + provenance + ')' : '')
       return React.createElement('details', { style: styles.details },
         React.createElement('summary', { style: styles.summary }, t('details')),
@@ -363,195 +211,185 @@ window.__ModuleLoader__.load({
     }
 
 
-    function SettingsTab({ scope, selectionScope, remote, t, view, useScope, useSelectionScope }) {
-      if (view === 'summary') return 'CLIProxyAPI model gateway'
-      const snapshot = useScope((value) => value)
-      const selectionSnapshot = useSelectionScope((value) => value)
-      const profile = snapshot?.value?.providers?.[PROVIDER]
-      const [baseURL, setBaseURL] = useState(DEFAULT_BASE_URL)
-      const [apiKey, setApiKey] = useState('')
-      const [credentialStatus, setCredentialStatus] = useState('unknown')
-      const [saving, setSaving] = useState(false)
-      const [feedback, setFeedback] = useState({ text: '', error: false })
-      const [models, setModels] = useState(undefined)
-      const [draft, setDraft] = useState({})
-      const [search, setSearch] = useState('')
-      const [loadingModels, setLoadingModels] = useState(false)
-      const requestGeneration = React.useRef(0)
-      const readOnly = snapshot?.status === 'ready' && !snapshot.writable
-      const selectionReady = selectionSnapshot?.status === 'ready' && selectionSnapshot.writable
-      const canSave = snapshot?.status === 'ready' && snapshot.writable && selectionReady && !saving && !loadingModels
-      useEffect(() => {
-        if (snapshot?.status !== 'ready') return
-        setBaseURL(typeof profile?.baseURL === 'string' && profile.baseURL.length > 0 ? profile.baseURL : DEFAULT_BASE_URL)
-      }, [profile?.baseURL, snapshot?.status])
+    const statusKeys = { 'not-configured': 'statusNotConfigured', disabled: 'statusDisabled', 'missing-credential': 'statusMissingKey', 'catalog-loading': 'statusLoading', ready: 'statusReady', stale: 'statusStale', reconfiguring: 'statusReconfiguring', 'no-models': 'statusNoModels', error: 'statusError' }
+    const catalogErrorKeys = { CATALOG_AUTH: 'catalogAuth', CATALOG_TIMEOUT: 'catalogTimeout', CATALOG_TRANSPORT: 'catalogTransport', CATALOG_INVALID_RESPONSE: 'catalogInvalidResponse', CATALOG_TOO_LARGE: 'catalogTooLarge' }
+    const diagnosticStageKeys = { http: 'diagnosticHttp', payload: 'diagnosticPayload', 'before-http': 'diagnosticBeforeHttp', timeout: 'diagnosticTimeout', abort: 'diagnosticAbort', 'sse-completed': 'diagnosticSseCompleted', 'sse-failed': 'diagnosticSseFailed', 'sse-incomplete': 'diagnosticSseIncomplete' }
 
+    function diagnosticView(diagnostic, index, t) {
+      const stage = Object.hasOwn(diagnosticStageKeys, diagnostic?.stage) ? diagnosticStageKeys[diagnostic.stage] : null
+      if (!stage) return null
+      const fields = [t(stage)]
+      if (Number.isInteger(diagnostic.status) && diagnostic.status >= 100 && diagnostic.status <= 599) fields.push(t('diagnosticStatus') + ': ' + diagnostic.status)
+      if (typeof diagnostic.requestId === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(diagnostic.requestId)) fields.push(t('diagnosticRequestId') + ': ' + diagnostic.requestId)
+      if (Number.isFinite(diagnostic.at) && diagnostic.at >= 0 && diagnostic.at <= 8640000000000000) fields.push(t('diagnosticAt') + ': ' + new Date(diagnostic.at).toISOString())
+      if (Number.isSafeInteger(diagnostic.toolCount) && diagnostic.toolCount >= 0) fields.push(t('diagnosticToolCount') + ': ' + diagnostic.toolCount)
+      return React.createElement('p', { key: index, role: 'status' }, fields.join(' · '))
+    }
+
+    function SettingsTab({ t, view, useScope }) {
+      if (view === 'summary') return t('intro')
+      const snapshot = useScope((value) => value)
+      const [state, setState] = useState(null)
+      const [baseURL, setBaseURL] = useState('')
+      const [apiKey, setApiKey] = useState('')
+      const [authType, setAuthType] = useState('keep')
+      const [reference, setReference] = useState('')
+      const [reuse, setReuse] = useState(false)
+      const [policy, setPolicy] = useState('{}')
+      const [draft, setDraft] = useState({})
+      const [models, setModels] = useState(null)
+      const [search, setSearch] = useState('')
+      const [busy, setBusy] = useState(false)
+      const [feedback, setFeedback] = useState('')
+      const [pending, setPending] = useState(null)
+      const [lastOperation, setLastOperation] = useState(null)
+      const requestGeneration = React.useRef(0)
+      const writable = snapshot?.status === 'ready' && snapshot.writable && state && !busy && !pending
       useEffect(() => {
         let active = true
-        const refresh = async () => {
-          const status = await credentialStatusOf(remote)
-          if (active) setCredentialStatus(status)
-        }
-        void refresh()
-        const dispose = remote.$on('credentials/reference-updated', (ref) => {
-          if (ref === CREDENTIAL_REF) void refresh()
-        })
-        return () => {
-          active = false
-          dispose()
-        }
-      }, [remote])
-      const loadModels = async (sourceURL = baseURL, sourceKey = apiKey) => {
-        const generation = ++requestGeneration.current
-        setLoadingModels(true)
-        setFeedback({ text: '', error: false })
+        readState().then((value) => {
+          if (!active) return
+          setState(value); setBaseURL(value.baseURL || ''); setPolicy(JSON.stringify(value.policy || {}, null, 2)); setModels(value.models || [])
+        }).catch(() => { if (active) setFeedback(t('unavailable')) })
+        return () => { active = false; requestGeneration.current += 1 }
+      }, [])
+      const complete = (operation, value) => {
+        setState(value); setModels(value.models || []); setPending(null); setFeedback(t('saved'))
+        if (operation.type === 'save-connection') { setDraft({}); setApiKey(''); setAuthType('keep') }
+        if (operation.type === 'save-selection') setDraft({})
+      }
+      const reconcile = async (operation) => {
         try {
-          const url = sourceURL.trim().replace(/\/+$/, '')
-          validBaseURL(url, { baseRequired: t('baseRequired'), baseInvalid: t('baseInvalid') })
-          const result = await discoverModels(url, sourceKey.trim(), { loadFailed: t('loadFailed'), noModels: t('noModels') })
-          if (generation === requestGeneration.current) setModels(result)
-        } catch (error) {
-          if (generation === requestGeneration.current) {
-            setFeedback({ text: error instanceof Error ? error.message : t('loadFailed'), error: true })
+          const value = await readState()
+          setState(value)
+          if (value.operationId === operation.operationId && value.revision > operation.expectedRevision) {
+            complete(operation, value)
+            return true
           }
-        } finally {
-          if (generation === requestGeneration.current) setLoadingModels(false)
-        }
+          setFeedback(t(value.revision !== operation.expectedRevision ? 'conflictPending' : 'uncertain'))
+          return false
+        } catch { setFeedback(t('uncertain')); return false }
       }
-
-      useEffect(() => {
-        if (snapshot?.status === 'ready' && profile?.baseURL) void loadModels(profile.baseURL, '')
-        return () => { requestGeneration.current += 1 }
-      }, [profile?.baseURL, snapshot?.status])
-
-      const invalidateModels = () => {
-        requestGeneration.current += 1
-        setModels(undefined)
-        setLoadingModels(false)
-      }
-
-
-      const submit = async (event) => {
-        event.preventDefault()
-        if (!canSave) return
-        const nextBaseURL = baseURL.trim().replace(/\/+$/, '')
-        const nextApiKey = apiKey.trim()
-        setSaving(true)
-        setFeedback({ text: '', error: false })
+      const sendOperation = async (operation, retry = false) => {
+        setBusy(true); setFeedback('')
         try {
-          validBaseURL(nextBaseURL, {
-            baseRequired: t('baseRequired'),
-            baseInvalid: t('baseInvalid'),
-            noModels: t('noModels'),
-          })
-          await installInitialProfile(remote, scope, selectionScope, nextBaseURL, nextApiKey, draft, {
-            noModels: t('noModels'),
-            loadFailed: t('loadFailed'),
-            needOneModel: t('needOneModel'),
-            selectionUnavailable: t('selectionUnavailable'),
-            saveFailed: t('saveFailed'),
-            partialSave: t('partialSave'),
-            syncTimeout: t('syncTimeout'),
-          })
-          setApiKey('')
-          setDraft({})
-          setFeedback({ text: t('saved'), error: false })
+          const value = await command(operation)
+          complete(operation, value)
         } catch (error) {
-          const safeMessages = ['baseRequired', 'baseInvalid', 'noModels', 'loadFailed', 'needOneModel', 'selectionUnavailable', 'saveFailed', 'partialSave', 'syncTimeout'].map((key) => t(key))
-          setFeedback({ text: error instanceof Error && safeMessages.includes(error.message) ? error.message : t('partialSave'), error: true })
-        } finally {
-          setSaving(false)
-        }
+          if (String(error.code || '').toUpperCase().includes('CONFLICT')) {
+            if (retry) { setPending(operation); await reconcile(operation) }
+            else { try { setState(await readState()) } catch { }; setFeedback(t('conflict')) }
+          } else if (error.code && !String(error.code).toUpperCase().includes('UNKNOWN')) {
+            if (retry) setPending(operation)
+            setFeedback(t('saveFailed'))
+          } else {
+            setPending(operation)
+            await reconcile(operation)
+          }
+        } finally { setBusy(false) }
       }
-      const isSelected = (model) => Object.prototype.hasOwnProperty.call(draft, model.id) ? draft[model.id] : selectionSnapshot?.value?.modelSelection?.[model.id] !== false
-      const selectedCount = models?.filter(isSelected).length || 0
-      const query = search.trim().toLowerCase()
-      const filtered = models?.filter((model) => (model.name || '').toLowerCase().includes(query) || model.id.toLowerCase().includes(query))
-      const selectLoaded = (checked) => setDraft((current) => ({ ...current, ...Object.fromEntries(models.map((model) => [model.id, checked])) }))
-
-      return React.createElement(
-        'div', { style: styles.section, 'aria-busy': saving || snapshot?.status === 'loading' },
-        React.createElement('div', { style: styles.heading },
-          React.createElement('h2', { style: styles.title }, t('title')),
-          React.createElement('p', { style: styles.intro }, t('intro')),
-        ),
-        snapshot?.status === 'unavailable'
-          ? React.createElement('p', { style: styles.statusError, role: 'alert' }, t('unavailable')) : null,
-        readOnly ? React.createElement('p', { style: styles.status, role: 'status' }, t('readOnly')) : null,
-        snapshot?.status === 'loading' ? React.createElement('p', { style: styles.status, role: 'status' }, t('loading')) : null,
-        React.createElement('form', { style: styles.form, onSubmit: submit, noValidate: true },
-          React.createElement('p', { style: styles.status, role: 'note' }, t('imageCapability')),
-          React.createElement('label', { style: styles.field },
-            React.createElement('span', { style: styles.label }, t('baseURL')),
-            React.createElement(Input, { type: 'url', value: baseURL, autoComplete: 'url', disabled: !canSave, onChange: (event) => { invalidateModels(); setBaseURL(event.currentTarget.value) } }),
-          ),
-          React.createElement('label', { style: styles.field },
-            React.createElement('span', { style: styles.labelRow },
-              React.createElement('span', { style: styles.label }, t('apiKey')),
-              credentialStatus === 'configured'
-                ? React.createElement('span', { style: styles.credentialStatus, role: 'status' }, t('credentialConfiguredLabel')) : null,
-            ),
-            React.createElement(Input, { type: 'password', value: apiKey, placeholder: credentialStatus === 'configured' ? t('apiKeyConfiguredPlaceholder') : t('apiKeyPlaceholder'), autoComplete: 'off', disabled: !canSave, onChange: (event) => { invalidateModels(); setApiKey(event.currentTarget.value) } }),
-          ),
-          !selectionReady ? React.createElement('p', { style: styles.status, role: 'status' }, t('selectionUnavailable')) : null,
-          React.createElement('div', { style: styles.field },
-            React.createElement('span', { style: styles.label }, t('models')),
-            React.createElement('p', { style: styles.status, role: 'note' }, t('modelsHelp')),
-            React.createElement('p', { style: styles.status, role: 'note' }, t('metadataHelp')),
-            models && selectedCount === 0 && profile ? React.createElement('p', { style: styles.statusError, role: 'alert' }, t('noEnabledRefresh')) : null,
-            React.createElement('div', { style: styles.toolbar }, React.createElement(Button, { type: 'button', variant: 'outline', size: 'sm', disabled: !canSave, onClick: () => loadModels() }, loadingModels ? t('loadingModels') : t('loadModels'))),
-            models ? React.createElement(React.Fragment, null,
-              React.createElement('label', { style: styles.field }, React.createElement('span', { style: styles.label }, t('search')), React.createElement(Input, { type: 'search', value: search, onChange: (event) => setSearch(event.currentTarget.value) })),
-              React.createElement('div', { style: styles.toolbar },
-                React.createElement('span', { style: styles.status, role: 'status' }, selectedCount, ' ', t('selectedCount'), ' ', models.length),
-                React.createElement(Button, { type: 'button', variant: 'outline', size: 'sm', style: { maxWidth: '100%', height: 'auto', minHeight: '28px', whiteSpace: 'normal' }, disabled: !canSave, onClick: () => selectLoaded(true) }, t('selectAll')),
-                React.createElement(Button, { type: 'button', variant: 'outline', size: 'sm', style: { maxWidth: '100%', height: 'auto', minHeight: '28px', whiteSpace: 'normal' }, disabled: !canSave, onClick: () => selectLoaded(false) }, t('deselectAll')),
-              ),
-              filtered.length ? React.createElement('div', { style: styles.modelList, role: 'region', 'aria-label': t('models'), tabIndex: 0 }, filtered.map((model) => React.createElement('div', { key: model.id, style: styles.model },
-                React.createElement('div', { style: styles.modelHeader }, React.createElement('div', { style: styles.modelName }, React.createElement(Checkbox, { label: t('enabled') + ' ' + (model.name || model.id), checked: isSelected(model), disabled: !canSave, onChange: (checked) => setDraft((current) => ({ ...current, [model.id]: checked })) })), React.createElement('span', { style: styles.status }, model.id)),
-                React.createElement('p', { style: styles.status }, [model.contextWindow != null ? t('context') + ': ' + model.contextWindow.toLocaleString() + (model.catalogSources?.contextWindow === 'default' ? ' (' + t('sourceDefault') + ')' : '') : '', model.maxTokens != null ? t('output') + ': ' + model.maxTokens.toLocaleString() + (model.catalogSources?.maxTokens === 'default' ? ' (' + t('sourceDefault') + ')' : '') : '', (model.inputModalities || model.input || []).join(', ')].filter(Boolean).join(' · ')),
-                modelEfforts(model, t),
-                modelDetails(model, t),
-              ))) : React.createElement('p', { style: styles.status, role: 'status' }, t('noMatches')),
-            ) : null,
-          ),
-          feedback.text ? React.createElement('p', { style: feedback.error ? styles.statusError : styles.status, role: feedback.error ? 'alert' : 'status' }, feedback.text) : null,
-          React.createElement('div', { style: styles.actions },
-            React.createElement(Button, { type: 'submit', variant: 'primary', size: 'md', disabled: !canSave }, saving ? t('saving') : t('save')),
-          ),
+      const mutate = async (type, fields = {}) => {
+        if (!writable) return
+        const operation = { type, expectedRevision: state.revision, operationId: createOperationId(), ...fields }
+        setLastOperation(operation.operationId)
+        await sendOperation(operation)
+      }
+      const returnToEdit = async (operation) => {
+        setBusy(true)
+        try {
+          const value = await readState()
+          if (value.operationId === operation.operationId && value.revision > operation.expectedRevision) complete(operation, value)
+          else { setState(value); setPending(null); setFeedback(t('conflict')) }
+        } catch { setFeedback(t('uncertain')) }
+        finally { setBusy(false) }
+      }
+      const submit = (event) => {
+        event.preventDefault()
+        try {
+          validBaseURL(baseURL.trim(), { baseRequired: t('baseRequired'), baseInvalid: t('baseInvalid') })
+          const parsedPolicy = JSON.parse(policy)
+          if (!parsedPolicy || Array.isArray(parsedPolicy) || typeof parsedPolicy !== 'object') throw new Error(t('policyInvalid'))
+          if (authType === 'replace' && !apiKey) throw new Error(t('keyRequired'))
+          if (authType === 'reference' && !reference.trim()) throw new Error(t('referenceRequired'))
+          const authEdit = authType === 'replace' ? { type: 'replace', key: apiKey } : authType === 'reference' ? { type: 'reference', ref: reference.trim(), allowEndpointReuse: reuse } : authType === 'keep' ? { type: 'keep', allowEndpointReuse: reuse } : { type: 'none' }
+          return mutate('save-connection', { baseURL: baseURL.trim(), authEdit, policy: parsedPolicy, selectionChanges: draft })
+        } catch (error) { setFeedback([t('baseRequired'), t('baseInvalid'), t('keyRequired'), t('referenceRequired')].includes(error.message) ? error.message : t('policyInvalid')) }
+      }
+      const preview = async () => {
+        const generation = ++requestGeneration.current
+        setBusy(true); setFeedback('')
+        try {
+          validBaseURL(baseURL.trim(), { baseRequired: t('baseRequired'), baseInvalid: t('baseInvalid') })
+          if (state?.baseURL !== baseURL.trim() && state?.keyConfigured && !(authType === 'replace' && apiKey) && !reuse) throw new Error(t('reuseRequired'))
+          if (authType === 'none' && state?.keyConfigured) throw new Error(t('previewNone'))
+          const value = await command({ type: 'preview-models', baseURL: baseURL.trim(), ...(authType === 'replace' && apiKey ? { apiKey } : {}), allowEndpointReuse: reuse })
+          if (generation === requestGeneration.current) setModels(value)
+        } catch (error) { if (generation === requestGeneration.current) setFeedback([t('reuseRequired'), t('previewNone')].includes(error.message) ? error.message : t('loadFailed')) }
+        finally { if (generation === requestGeneration.current) setBusy(false) }
+      }
+      const refresh = async () => {
+        setBusy(true); setFeedback('')
+        try { const value = await command({ type: 'refresh-models', connectionGeneration: state.generation }); setState(value); setModels(value.models || []) }
+        catch { setFeedback(t('loadFailed')); try { setState(await readState()) } catch { } }
+        finally { setBusy(false) }
+      }
+      const list = models || []
+      const selected = (model) => Object.hasOwn(draft, model.id) ? draft[model.id] : state?.modelSelection?.[model.id] !== false
+      const filtered = list.filter((model) => (model.name || '').toLowerCase().includes(search.toLowerCase()) || model.id.toLowerCase().includes(search.toLowerCase()))
+      const button = (label, action, disabled = !writable) => React.createElement(Button, { type: 'button', disabled, onClick: action }, t(label))
+      return React.createElement('div', { style: styles.section, 'aria-busy': busy || !state },
+        React.createElement('h2', { style: styles.title }, t('title')),
+        React.createElement('p', { style: styles.status }, t('intro')),
+        !state ? React.createElement('p', { role: 'status' }, t('loading')) : React.createElement('p', { role: 'status' }, t(statusKeys[state.status] || 'statusError')),
+        snapshot?.status === 'ready' && !snapshot.writable ? React.createElement('p', { role: 'status' }, t('readOnly')) : null,
+        state?.activationError ? React.createElement('p', { role: 'alert' }, t('activationFailed')) : null,
+        state ? React.createElement('p', { role: 'status' }, t('revision'), ': ', state.revision, state.operationId ? ' · ' + t('operationId') + ': ' + state.operationId : '') : null,
+        lastOperation ? React.createElement('p', { role: 'status' }, t('operationId'), ': ', lastOperation) : null,
+        state?.catalog?.error ? React.createElement('p', { role: 'status' }, t(Object.hasOwn(catalogErrorKeys, state.catalog.error.code) ? catalogErrorKeys[state.catalog.error.code] : 'catalogError')) : null,
+        (state?.diagnostics || []).map((diagnostic, index) => diagnosticView(diagnostic, index, t)),
+        feedback ? React.createElement('p', { role: 'status' }, feedback) : null,
+        pending ? React.createElement('div', null, React.createElement('p', null, t('operationId'), ': ', pending.operationId), button('reconcile', async () => { setBusy(true); try { await reconcile(pending) } finally { setBusy(false) } }, busy), button('retryOperation', () => sendOperation(pending, true), busy || snapshot?.status !== 'ready' || !snapshot.writable), button('returnToEdit', () => returnToEdit(pending), busy)) : null,
+        React.createElement('form', { style: styles.form, onSubmit: submit },
+          React.createElement('label', { style: styles.field }, t('baseURL'), React.createElement(Input, { type: 'url', value: baseURL, disabled: !writable, onChange: (event) => { requestGeneration.current += 1; setBaseURL(event.currentTarget.value); setReuse(false); setApiKey('') } })),
+          baseURL.trim().toLowerCase().startsWith('http:') ? React.createElement('p', { role: 'note' }, t('httpWarning')) : null,
+          React.createElement('label', { style: styles.field }, t('authAction'), React.createElement('select', { value: authType, disabled: !writable, onChange: (event) => setAuthType(event.currentTarget.value) }, ['keep', 'replace', 'reference', 'none'].map((type) => React.createElement('option', { key: type, value: type }, t('auth' + type))))),
+          authType === 'replace' ? React.createElement('label', { style: styles.field }, t('apiKey'), React.createElement(Input, { type: 'password', value: apiKey, autoComplete: 'off', disabled: !writable || !state?.keyWritable, onChange: (event) => setApiKey(event.currentTarget.value) })) : null,
+          authType === 'reference' ? React.createElement('label', { style: styles.field }, t('reference'), React.createElement(Input, { value: reference, disabled: !writable, onChange: (event) => setReference(event.currentTarget.value) })) : null,
+          state?.baseURL && baseURL.trim() !== state.baseURL && (authType === 'keep' || authType === 'reference') ? React.createElement(Checkbox, { label: t('reuseConsent'), checked: reuse, disabled: !writable, onChange: setReuse }) : null,
+          React.createElement('label', { style: styles.field }, t('policy'), React.createElement('textarea', { value: policy, disabled: !writable, onChange: (event) => setPolicy(event.currentTarget.value) })),
+          React.createElement('p', { role: 'note' }, t('modelsHelp')),
+          React.createElement('div', { style: styles.toolbar }, button('loadModels', preview), button('refresh', refresh, !writable || !state?.generation)),
+          React.createElement('label', { style: styles.field }, t('search'), React.createElement(Input, { type: 'search', value: search, onChange: (event) => setSearch(event.currentTarget.value) })),
+          React.createElement('div', { style: styles.toolbar }, React.createElement('span', null, list.filter(selected).length, ' ', t('selectedCount'), ' ', list.length), button('selectAll', () => setDraft((current) => ({ ...current, ...Object.fromEntries(list.map((model) => [model.id, true])) }))), button('deselectAll', () => setDraft((current) => ({ ...current, ...Object.fromEntries(list.map((model) => [model.id, false])) })))),
+          list.length && !list.filter(selected).length ? React.createElement('p', { role: 'status' }, t('statusNoModels')) : null,
+          React.createElement('div', { style: styles.modelList }, filtered.map((model) => React.createElement('div', { key: model.id, style: styles.model }, React.createElement(Checkbox, { label: t('enabled') + ' ' + (model.name || model.id), checked: selected(model), disabled: !writable, onChange: (checked) => setDraft((current) => ({ ...current, [model.id]: checked })) }), React.createElement('span', null, model.id), modelEfforts(model, t), modelDetails(model, t)))),
+          list.length && !filtered.length ? React.createElement('p', { role: 'status' }, t('noMatches')) : null,
+          React.createElement(Button, { type: 'submit', disabled: !writable }, t('save')),
+          button('saveSelection', () => mutate('save-selection', { selectionChanges: draft })),
+          button(state?.enabled ? 'disconnect' : 'enableConnection', () => mutate('set-enabled', { enabled: !state.enabled }), !writable || !state?.configured),
+          React.createElement('p', { role: 'note' }, t('disconnectHelp')),
+          button('forgetKey', () => mutate('forget-key'), !writable || !state?.keyConfigured),
+          React.createElement('p', { role: 'note' }, t('forgetHelp')),
+          state?.legacy?.available ? button('importLegacy', () => mutate('import-legacy', { expectedLegacyRevision: state.legacy.revision, fingerprint: state.legacy.fingerprint })) : null,
         ),
       )
     }
 
+    function ModelsFooter({ t, pluginNavigation }) {
+      const [state, setState] = useState(null)
+      useEffect(() => { let active = true; readState().then((value) => { if (active) setState(value) }).catch(() => { }); return () => { active = false } }, [])
+      return React.createElement('div', null, React.createElement('p', { role: 'status' }, 'CLIProxyAPI: ', t(state ? statusKeys[state.status] || 'statusError' : 'loading')), React.createElement(Button, { type: 'button', onClick: () => pluginNavigation.openList() }, t('openSettings')), React.createElement('p', null, t('chooseCPA')))
+    }
+
     function apply(ctx) {
-      const remote = ctx.remote
       const locale = ctx.locale
-      const configForms = ctx.configForms
-      const scope = configForms.get(PI_NS)
-      const selectionScope = configForms.get(DISCOVERY_NS)
+      const scope = ctx.configForms.get(DISCOVERY_NS)
       const t = locale.bind(SETTINGS_LOCALE_NS)
       const pluginT = locale.bind(SETTINGS_SUMMARY_NS)
-
       ctx.effect(() => locale.register(SETTINGS_LOCALE_NS, copy), 'dsh-provider-cpa: dictionaries')
-      ctx.effect(() => locale.register(SETTINGS_SUMMARY_NS, {
-        en: { title: 'CLIProxyAPI', description: 'Connect to a CLIProxyAPI model gateway.' },
-        zh: { title: 'CLIProxyAPI', description: '连接 CLIProxyAPI 模型网关。' },
-      }), 'dsh-provider-cpa: Plugins page copy')
-      ctx.effect(() => configForms.whileServed([PI_NS, DISCOVERY_NS], () => ctx.slots.inject(SETTINGS_SLOT, () => ctx.slots.register({
-        name: SETTINGS_SLOT,
-        id: SETTINGS_TAB_ID,
-        order: 30,
-        label: () => pluginT('title'),
-        description: () => pluginT('description'),
-        locale: SETTINGS_SUMMARY_NS,
-        inject: () => ({
-          remote,
-          scope,
-          selectionScope,
-          t,
-          hooks: { scope, selectionScope },
-        }),
-      }, SettingsTab))), 'dsh-provider-cpa: settings page')
+      ctx.effect(() => locale.register(SETTINGS_SUMMARY_NS, { en: { title: 'CLIProxyAPI', description: 'Connect to a CLIProxyAPI model gateway.' }, ru: { title: 'CLIProxyAPI', description: 'Подключение к шлюзу CLIProxyAPI.' }, zh: { title: 'CLIProxyAPI', description: '连接 CLIProxyAPI 模型网关。' } }), 'dsh-provider-cpa: Plugins page copy')
+      ctx.effect(() => ctx.configForms.whileServed([DISCOVERY_NS], () => ctx.slots.inject(SETTINGS_SLOT, () => ctx.slots.register({ name: SETTINGS_SLOT, id: SETTINGS_TAB_ID, order: 30, label: () => pluginT('title'), description: () => pluginT('description'), locale: SETTINGS_SUMMARY_NS, inject: () => ({ t, hooks: { scope } }) }, SettingsTab))), 'dsh-provider-cpa: settings page')
+      ctx.effect(() => ctx.slots.inject('settings.models.footer', () => ctx.slots.register({ name: 'settings.models.footer', id: 'cliproxyapi', inject: () => ({ t, pluginNavigation: ctx.pluginNavigation }) }, ModelsFooter)), 'dsh-provider-cpa: models footer')
     }
 
     exports.apply = apply

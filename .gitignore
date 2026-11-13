@@ -1,2 +1,8 @@
 node_modules/
 .npm-cache/
+.agent/
+.env*
+*.log
+*.tgz
+dist/
+build/

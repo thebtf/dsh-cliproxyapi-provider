@@ -1,3 +1,5 @@
+import { credentialField } from './secrets.js'
+
 const CANONICAL_REASONING_LEVELS = new Set([
   'off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
 ])
@@ -49,6 +51,15 @@ function inputModalitiesOf(entry, fallback) {
   }
   return modalities.length ? modalities : [...fallback]
 }
+function safeMetadata(value) {
+  if (Array.isArray(value)) return value.map(safeMetadata)
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [
+    key,
+    credentialField(key) ? '[redacted]' : safeMetadata(item),
+  ]))
+}
+
 
 export function modelProfileOf(entry, options = {}) {
   const id = nonEmptyString(entry?.slug, entry?.id, entry?.model)
@@ -73,15 +84,30 @@ export function readCodexCatalogWithMetadata(body, options = {}) {
     const model = modelProfileOf(entry, options)
     if (!model || seen.has(model.id)) continue
     seen.add(model.id)
+    const override = options.overrides?.[model.id] ?? {}
+    const overrideContext = positiveInteger(override.contextWindow)
+    const overrideMax = positiveInteger(override.maxTokens)
+    const overrideInput = Array.isArray(override.inputModalities) && override.inputModalities.length && override.inputModalities.every((value) => value === 'text' || value === 'image') ? [...new Set(override.inputModalities)] : undefined
+    const overrideEfforts = override.reasoningEfforts && typeof override.reasoningEfforts === 'object' && !Array.isArray(override.reasoningEfforts) ? Object.fromEntries(Object.entries(override.reasoningEfforts).filter(([level, wire]) => CANONICAL_REASONING_LEVELS.has(level) && (typeof wire === 'string' && wire.length > 0 || level === 'off' && wire === null))) : undefined
+    if (overrideContext) model.contextWindow = overrideContext
+    if (typeof override.name === 'string' && override.name) model.name = override.name
+    if (override.reasoningEfforts === false) delete model.reasoningEfforts
+    if (override.compat && typeof override.compat === 'object') model.compat = override.compat
+    if (overrideMax) model.maxTokens = overrideMax
+    if (overrideInput) model.input = overrideInput
+    if (overrideEfforts && Object.keys(overrideEfforts).some((level) => level !== 'off')) model.reasoningEfforts = overrideEfforts
+    const defaultEffort = normalizeReasoningLevel(override.defaultReasoningEffort ?? entry.default_reasoning_level)?.canonical
     models.push(model)
     discovery.push({
       ...model,
       inputModalities: [...model.input],
-      catalogMetadata: structuredClone(entry),
+      ...(defaultEffort && model.reasoningEfforts?.[defaultEffort] !== undefined ? { defaultReasoningEffort: defaultEffort } : {}),
+      catalogMetadata: safeMetadata(entry),
       catalogSources: {
-        contextWindow: positiveInteger(entry.max_context_window, entry.context_window, entry.context_length) ? 'cpa' : 'default',
-        maxTokens: positiveInteger(entry.max_output_tokens, entry.max_completion_tokens, entry.max_tokens) ? 'cpa' : 'default',
-        inputModalities: Array.isArray(entry.input_modalities) && entry.input_modalities.some((value) => ['text', 'image'].includes(nonEmptyString(value)?.toLowerCase())) ? 'cpa' : 'default',
+        contextWindow: overrideContext ? 'override' : positiveInteger(entry.max_context_window, entry.context_window, entry.context_length) ? 'cpa' : 'default',
+        maxTokens: overrideMax ? 'override' : positiveInteger(entry.max_output_tokens, entry.max_completion_tokens, entry.max_tokens) ? 'cpa' : 'default',
+        inputModalities: overrideInput ? 'override' : Array.isArray(entry.input_modalities) && entry.input_modalities.some((value) => ['text', 'image'].includes(nonEmptyString(value)?.toLowerCase())) ? 'cpa' : 'default',
+        reasoningEfforts: overrideEfforts && Object.keys(overrideEfforts).some((level) => level !== 'off') ? 'override' : reasoningEffortsOf(entry) ? 'cpa' : 'default',
       },
     })
   }
@@ -94,8 +120,10 @@ export function readCodexCatalog(body, options = {}) {
 }
 
 export function catalogURL(baseURL) {
-  const base = String(baseURL ?? '').trim().replace(/\/+$/, '')
+  const base = String(baseURL ?? '').trim()
   if (!base) throw new TypeError('CLIProxyAPI baseURL must not be empty')
-  const query = new URLSearchParams({ client_version: 'dsh-cliproxyapi-provider' })
-  return base + '/models?' + query
+  const url = new URL(base)
+  url.pathname = url.pathname.replace(/\/+$/, '') + '/models'
+  url.searchParams.set('client_version', 'dsh-cliproxyapi-provider')
+  return url.toString()
 }

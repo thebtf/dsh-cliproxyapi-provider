@@ -1,0 +1,12 @@
+.git
+.agent/
+.omp/
+.specify/
+node_modules/
+.npm-cache/
+.env*
+*.log*
+*.tgz
+coverage/
+Dockerfile*
+.dockerignore

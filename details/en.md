@@ -1,13 +1,9 @@
 # CLIProxyAPI for DeepSeek Harness
 
-This plugin connects CLIProxyAPI through the OpenAI Responses API and automatically loads and refreshes the available model list.
+Open **Plugins**, then select **CLIProxyAPI**. Enter your actual endpoint and explicitly choose keep, replace, reference, or no authentication. HTTP is unencrypted. A changed endpoint cannot reuse saved credentials without consent.
 
-## Setup
+Preview models, search or select all/deselect all, then save the connection, policy and model draft together. Zero selected models is valid but not ready. Details show metadata, source labels and advertised reasoning efforts. A stale catalog can remain available after a refresh failure. Save and activation are reported separately.
 
-1. Return to **Plugins** and select **CLIProxyAPI** under **Built-in plugin settings**. This is a separate entry from the installed package's detail page.
-2. Enter your server's **Base URL**, for example `http://127.0.0.1:8317/v1`, and API key. Leave the key empty if the server does not require one.
-3. Select **Load models**, search by name or ID, and use the select/deselect-all controls to choose your models. Rows show limits, input types and reasoning efforts; **Model details → All CPA fields** contains the full returned metadata. Select **Save & Enable** and wait for the synchronization confirmation before choosing an imported model in chat.
+Disable retains the configuration and credential; forget-key is separate. Import a legacy profile explicitly and inspect recovery errors before retrying. Do not overwrite newer settings with an old rollback backup.
 
-Fully restart DeepSeek Harness after installing or updating the plugin. This version targets DSH `0.2.2-rc.1`.
-
-The plugin uses the built-in `llm-pi-ai` adapter; it does not change the conversation history or tools sent to the model.
+The Models footer opens Plugins; select CLIProxyAPI there. It does not provide a full managed Models row. Restart DSH after installing or updating. Requires Node 24.9.0 or newer and DSH 0.2.2-rc.2; `engines.dsh` accepts the rest of the 0.2.x line.

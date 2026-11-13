@@ -5,6 +5,8 @@ import { assertUsableApiKey, attributionHeaders } from '@deepseek-ai/dsh-llm'
 import { Config as PiAiConfig } from '@deepseek-ai/dsh-llm-pi-ai'
 import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
 import { catalogURL, readCodexCatalogWithMetadata } from './catalog.js'
+import { installGateway } from './gateway.js'
+import { ConnectionError, resolveIdentity, validateEndpoint } from './connection.js'
 
 const MAX_CATALOG_BYTES = 4 * 1024 * 1024
 const DISCOVERY_HANDOFF_TTL_MS = 60_000
@@ -31,6 +33,14 @@ export const Config = z.object({
   retryMaxMs: z.number().step(1).min(1).default(60000),
   modelSelection: z.dict(z.boolean()).default({}).volatile(),
   refreshIntervalMs: z.number().step(1).min(0).default(300000),
+  baseURL: z.string().volatile(),
+  enabled: z.boolean().default(true).volatile(),
+  authIdentity: z.any().volatile(),
+  policy: z.any().volatile(),
+  generation: z.string().volatile(),
+  operationId: z.string().volatile(),
+  overrides: z.any().volatile(),
+  migration: z.any().volatile(),
 })
 
 function normalizedBaseURL(value) {
@@ -129,7 +139,7 @@ async function readBoundedJson(response, maxBytes = MAX_CATALOG_BYTES) {
   const declared = Number(response.headers.get('content-length') ?? Number.NaN)
   if (Number.isFinite(declared) && declared > maxBytes) {
     await response.body?.cancel()
-    throw new Error('CLIProxyAPI JSON exceeds ' + maxBytes + ' bytes')
+    throw new ConnectionError('CATALOG_TOO_LARGE', 'CPA catalog is too large')
   }
   if (!response.body) return JSON.parse(await response.text())
   const reader = response.body.getReader()
@@ -140,7 +150,7 @@ async function readBoundedJson(response, maxBytes = MAX_CATALOG_BYTES) {
       const part = await reader.read()
       if (part.done) break
       total += part.value.byteLength
-      if (total > maxBytes) throw new Error('CLIProxyAPI JSON exceeds ' + maxBytes + ' bytes')
+      if (total > maxBytes) throw new ConnectionError('CATALOG_TOO_LARGE', 'CPA catalog is too large')
       chunks.push(part.value)
     }
   } finally {
@@ -165,6 +175,7 @@ async function discoverCatalog(ctx, options, suppliedApiKey, parentSignal) {
     try {
       response = await fetch(url, {
         method: 'GET',
+        redirect: 'error',
         signal: request.signal,
         headers: {
           accept: 'application/json',
@@ -174,18 +185,23 @@ async function discoverCatalog(ctx, options, suppliedApiKey, parentSignal) {
         },
       })
     } catch (error) {
-      if (request.signal.aborted) throw request.signal.reason ?? error
-      throw new Error('Could not reach CLIProxyAPI at ' + url, { cause: error })
+      if (parentSignal?.aborted) throw parentSignal.reason ?? error
+      if (request.signal.aborted) throw new ConnectionError('CATALOG_TIMEOUT', `CLIProxyAPI model catalog timed out after ${options.fetchTimeoutMs} ms`)
+      throw new ConnectionError('CATALOG_TRANSPORT', 'Could not reach CPA catalog')
     }
     if (!response.ok) {
-      throw new Error('CLIProxyAPI model catalog answered ' + response.status + ((response.status === 401 || response.status === 403) ? '; save a valid API key in Settings' : ''))
+      const failure = new ConnectionError(response.status === 401 || response.status === 403 ? 'CATALOG_AUTH' : 'CATALOG_TRANSPORT', 'CPA catalog request failed')
+      failure.status = response.status
+      throw failure
     }
     let body
     try {
       body = await readBoundedJson(response)
     } catch (error) {
-      if (request.signal.aborted) throw request.signal.reason ?? error
-      throw new Error('CLIProxyAPI model catalog did not return usable JSON', { cause: error })
+      if (parentSignal?.aborted) throw parentSignal.reason ?? error
+      if (request.signal.aborted) throw new ConnectionError('CATALOG_TIMEOUT', `CLIProxyAPI model catalog timed out after ${options.fetchTimeoutMs} ms`)
+      if (error?.code === 'CATALOG_TOO_LARGE') throw error
+      throw new ConnectionError('CATALOG_INVALID_RESPONSE', 'CPA catalog returned invalid JSON')
     }
     try {
       return {
@@ -193,7 +209,7 @@ async function discoverCatalog(ctx, options, suppliedApiKey, parentSignal) {
         hasApiKey: apiKey !== undefined,
       }
     } catch (error) {
-      throw new Error('Expected the CLIProxyAPI Codex catalog with a "models" array', { cause: error })
+      throw new ConnectionError('CATALOG_INVALID_RESPONSE', 'CPA catalog response is invalid')
     }
   } finally {
     request.dispose()
@@ -303,6 +319,27 @@ export function apply(ctx, config) {
     if (!handoff || Date.now() - handoff.storedAt > DISCOVERY_HANDOFF_TTL_MS) return undefined
     return handoff.models
   }
+  const previewKey = async (endpoint, supplied, allowEndpointReuse) => {
+    validateEndpoint(endpoint)
+    if (supplied !== undefined) {
+      if (typeof supplied !== 'string' || Buffer.byteLength(supplied) > 4096) throw new ConnectionError('INVALID_AUTH', 'Invalid key')
+      return supplied
+    }
+    if (allowEndpointReuse !== undefined && typeof allowEndpointReuse !== 'boolean') throw new ConnectionError('INVALID_REQUEST', 'Invalid endpoint reuse')
+    const settings = ctx.settings.describe()
+    const own = settings.find((entry) => entry.ns === DISCOVERY_NS)?.value
+    if (own?.baseURL && own.authIdentity) {
+      if (own.baseURL !== endpoint && allowEndpointReuse !== true) return ''
+      if (own.authIdentity.type === 'missing') throw new ConnectionError('MISSING_CREDENTIAL', 'CPA credential is missing')
+      const key = await resolveIdentity(ctx.credentials, own.authIdentity)
+      if (own.authIdentity.type !== 'none' && !key) throw new ConnectionError('MISSING_CREDENTIAL', 'CPA credential is missing')
+      return key ?? ''
+    }
+    const legacy = settings.find((entry) => entry.ns === PI_NS)?.value?.providers?.[PROVIDER]
+    if (legacy?.baseURL === endpoint) return (await optionalApiKey(ctx)) ?? ''
+    return ''
+  }
+
 
   const discoverModels = async (request, signal) => {
     const activeConfig = currentConfig()
@@ -311,46 +348,31 @@ export function apply(ctx, config) {
       defaultContextWindow: activeConfig.defaultContextWindow,
       defaultMaxTokens: activeConfig.defaultMaxTokens,
       defaultInput: activeConfig.defaultInput,
-      headers: activeConfig.headers,
+      headers: {},
       fetchTimeoutMs: activeConfig.fetchTimeoutMs,
-    }, request.apiKey, signal ?? request.signal)
+    }, await previewKey(request.baseURL, request.apiKey, request.allowEndpointReuse), signal ?? request.signal)
     rememberDiscovery(request.baseURL, catalog.models)
     return catalog.discovery
   }
   ctx.llm.registerModelDiscovery(DISCOVERY_NS, discoverModels)
+  installGateway(ctx, currentConfig, async (request, signal, key) => discoverCatalog(ctx, {
+    baseURL: request.baseURL,
+    defaultContextWindow: request.policy?.defaultContextWindow ?? currentConfig().defaultContextWindow,
+    defaultMaxTokens: request.policy?.defaultMaxTokens ?? currentConfig().defaultMaxTokens,
+    defaultInput: request.policy?.defaultInput ?? currentConfig().defaultInput,
+    overrides: request.overrides,
+    headers: request.policy?.headers ?? {},
+    fetchTimeoutMs: currentConfig().fetchTimeoutMs,
+  }, key ?? '', signal), readBoundedJson, previewKey)
 
-  ctx.inject(['connection'], (web) => web.connection.fetch.register({
-    path: CATALOG_PATH,
-    methods: ['POST'],
-    requestBody: 'buffered',
-    async fetch(request) {
-      const reply = (status, result) => Response.json(result, { status, headers: { 'cache-control': 'no-store' } })
-      const failure = (status, code) => reply(status, { ok: false, error: { code, message: 'Could not load the CLIProxyAPI model catalog', details: {} } })
-      if (request.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase() !== 'application/json') return failure(415, 'cliproxyapi/invalid-request')
-      let input
-      try {
-        input = await readBoundedJson(request, 16 * 1024)
-      } catch {
-        return failure(400, 'cliproxyapi/invalid-request')
-      }
-      if (!input || typeof input !== 'object' || Array.isArray(input) ||
-        Object.keys(input).some((key) => key !== 'baseURL' && key !== 'apiKey') ||
-        typeof input.baseURL !== 'string' || input.baseURL.length > 4096 ||
-        (input.apiKey !== undefined && typeof input.apiKey !== 'string')) return failure(400, 'cliproxyapi/invalid-request')
-      try {
-        const models = await discoverModels(input, request.signal)
-        return reply(200, { ok: true, value: models })
-      } catch {
-        return failure(502, 'cliproxyapi/catalog-rejected')
-      }
-    },
-  }))
 
   let observedRefreshKey
 
   const synchronize = async (signal, authOnly = false) => {
     const activeConfig = currentConfig()
     const settings = ctx.settings.describe()
+    const own = settings.find((entry) => entry.ns === DISCOVERY_NS)?.value
+    if (own?.baseURL && own.migration?.phase !== 'prepared') return false
     const descriptor = settings.find((entry) => entry.ns === PI_NS)
     const profile = descriptor?.value?.providers?.[PROVIDER]
     if (!profile) return false
