@@ -6,10 +6,10 @@
 
 ## 安装与配置
 
-需要 Node.js 24.9.0 或更新版本和 DeepSeek Harness 0.2.2-rc.2（`engines.dsh` 允许 0.2.x 系列，核心小版本更新不会停用插件）：
+需要 Node.js 24.9.0 或更新版本和 DeepSeek Harness 0.2.2-rc.3（`engines.dsh` 允许 0.2.x 系列，核心小版本更新不会停用插件）：
 
 ```powershell
-npx @deepseek-ai/dsh plugin --profile web add 'github:thebtf/dsh-cliproxyapi-provider#v0.4.2'
+npx @deepseek-ai/dsh plugin --profile web add 'github:thebtf/dsh-cliproxyapi-provider#v0.4.3'
 # 滚动通道：github:thebtf/dsh-cliproxyapi-provider#latest
 npx @deepseek-ai/dsh web
 ```
@@ -17,6 +17,8 @@ npx @deepseek-ai/dsh web
 安装或升级后重启 Web 或 Desktop。在侧边栏 **插件** 页面选择 **CLIProxyAPI**，先选择网关提供的通信协议，再填写实际地址；不会自动假定本地地址。模型目录对所有协议都从同一个 `/models` 地址读取。明确选择保留身份、替换密钥、使用凭据引用或不使用验证。HTTP 不加密，密钥和请求可能泄露；对新地址重用已有身份需要明确同意。
 
 预览目录后可搜索、选择模型；批量操作针对全部已加载模型。保存会一起提交地址、验证操作、策略和模型草稿。允许保存零个模型，但此时原生连接不可用。暂时缺失的模型选择会保留，新模型默认启用。模型详情显示元数据、能力来源和已声明的推理等级。刷新失败时保留上次可用目录并标记过期；保存成功不代表激活成功。
+
+插件在配置文件之外还保留一份已保存连接的副本。如果配置文件被重建、设置条目被核心版本门禁停用或包被重装导致连接消失，页面会显示 **恢复已保存的连接**，无需重新输入地址和密钥。
 
 **停用连接**保留地址、凭据和模型选择；**忘记密钥**是单独操作，可能导致连接不可用，不会自动切换为无验证模式。直接 CPA API 调用不受影响。
 
@@ -28,4 +30,4 @@ npx @deepseek-ai/dsh web
 
 Models 页底部显示 CPA 状态和 **打开插件**。点击后再选择 **CLIProxyAPI** 进入设置。这不是 Models 主列表中的完整自主管理行；其中原生编辑／删除操作不是 CPA 生命周期操作。
 
-`latest` 通道需要支持 GitHub 的更新器；DSH 0.2.2-rc.2 的原生 Versions 只更新 registry 安装。这里不表示发布到 npm。卸载命令：`npx @deepseek-ai/dsh plugin --profile web remove @router-for-me/dsh-cliproxyapi-provider`，然后重启；卸载不承诺删除已保存配置。
+`latest` 通道需要支持 GitHub 的更新器；DSH 0.2.2-rc.3 的原生 Versions 只更新 registry 安装。这里不表示发布到 npm。卸载命令：`npx @deepseek-ai/dsh plugin --profile web remove @router-for-me/dsh-cliproxyapi-provider`，然后重启；卸载不承诺删除已保存配置。

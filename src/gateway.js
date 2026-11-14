@@ -5,6 +5,7 @@ import { legacyView, prepareLegacy, cutoverLegacy, finishLegacy, rollbackLegacy,
 import { createGatewayAdapter } from './adapter.js'
 import { validatePolicy } from './policy.js'
 import { credentialField } from './secrets.js'
+import { readConnectionSnapshot, removeConnectionSnapshot, writeConnectionSnapshot } from './connection-store.js'
 
 const NS = 'llm-cliproxyapi'
 const PROVIDER = 'CLIProxyAPI'
@@ -23,6 +24,7 @@ const fields = {
   'set-enabled': ['type', 'expectedRevision', 'operationId', 'enabled'],
   'forget-key': ['type', 'expectedRevision', 'operationId'],
   'import-legacy': ['type', 'expectedRevision', 'operationId', 'expectedLegacyRevision', 'fingerprint'],
+  'restore-connection': ['type', 'expectedRevision', 'operationId'],
   'rollback-legacy': ['type', 'expectedRevision', 'operationId'],
 }
 const objectWithFields = (input, allowed) => {
@@ -42,6 +44,9 @@ export function installGateway(ctx, config, discover, readJson, previewKey) {
   let freshness = 'empty'
   let catalogError
   let activationError
+  // Recovery diagnostics describe this process start, not the saved connection,
+  // so they are never persisted into the state the UI reads back.
+  let recoveryError
   let loading = false
   let stopped = false
   let wakeDispose
@@ -72,6 +77,48 @@ export function installGateway(ctx, config, discover, readJson, previewKey) {
   }
   const gateway = createGatewayAdapter(ctx, undefined, diagnostics, () => { void activate().catch(() => { }) })
   const compatibleCatalog = (value) => catalog && catalog.generation === value.generation && catalog.baseURL === value.baseURL && JSON.stringify(catalog.authIdentity) === JSON.stringify(value.authIdentity)
+  // The settings row lives in the profile patch file. It can disappear when the
+  // profile is rebuilt, a compatibility gate denies a row, or the bundle is
+  // reinstalled, so every saved connection is mirrored into a plugin-owned
+  // snapshot under the DSH home and can be restored without the user retyping it.
+  let durable
+  let durableLoaded = false
+  const loadDurable = async () => {
+    if (durableLoaded) return durable
+    durableLoaded = true
+    try { durable = await readConnectionSnapshot(ctx.settings.documentPath) } catch { durable = undefined }
+    return durable
+  }
+  const persist = async (value) => {
+    if (!value?.baseURL || !value?.generation) return
+    try { durable = await writeConnectionSnapshot(ctx.settings.documentPath, value); durableLoaded = true } catch { }
+  }
+  const durability = async () => {
+    const snapshot = await loadDurable()
+    return snapshot ? { available: true, savedAt: snapshot.savedAt, baseURL: snapshot.baseURL } : { available: false }
+  }
+  const restore = async (operationId, expectedRevision) => {
+    const snapshot = await loadDurable()
+    if (!snapshot) throw new ConnectionError('NO_SNAPSHOT', 'No saved connection is available to restore')
+    const before = descriptor()
+    if (before.value?.baseURL) throw new ConnectionError('SETTINGS_CONFLICT', 'A connection is already configured')
+    if (typeof operationId !== 'string' || !operationId || operationId.length > 256) throw new ConnectionError('INVALID_REQUEST', 'An operation ID is required')
+    if (Number.isSafeInteger(expectedRevision) && expectedRevision !== before.revision) throw new ConnectionError('SETTINGS_CONFLICT', 'Connection settings have changed')
+    const generation = generationFor(operationId, before.revision)
+    const values = {
+      baseURL: snapshot.baseURL,
+      authIdentity: structuredClone(snapshot.authIdentity),
+      enabled: snapshot.enabled !== false,
+      policy: structuredClone(snapshot.policy ?? {}),
+      modelSelection: structuredClone(snapshot.modelSelection ?? {}),
+      overrides: structuredClone(snapshot.overrides ?? {}),
+      operationId,
+      generation,
+    }
+    const ops = Object.entries(values).map(([key, value]) => ({ op: 'set', path: [key], value }))
+    await ctx.settings.mutate(NS, ops, before.revision)
+    return generation
+  }
   const activate = async () => {
     const value = current()
     let ready = !!value.baseURL && value.enabled !== false && !['prepared', 'rollback'].includes(value.migration?.phase) && compatibleCatalog(value)
@@ -89,6 +136,8 @@ export function installGateway(ctx, config, discover, readJson, previewKey) {
       if (registration) registration.replace([PROVIDER])
       else registration = ctx.llm.registerAdapter([PROVIDER], gateway.adapter)
       activationError = undefined
+      recoveryError = undefined
+      void persist(value)
     } catch {
       try { registration?.replace([]) } catch { }
       activationError = errorView('ACTIVATION_FAILED', 'Could not activate CPA route; another owner may be using it')
@@ -103,6 +152,7 @@ export function installGateway(ctx, config, discover, readJson, previewKey) {
     const authReady = value.authIdentity?.type === 'none' || keyConfigured
     const models = compatibleCatalog(value) ? catalog.effective : []
     const configured = !!value.baseURL
+    const saved = await durability()
     const status = !configured ? 'not-configured' : value.enabled === false ? 'disabled' : !authReady ? 'missing-credential' : loading ? 'catalog-loading' : activationError ? 'error' : !models.length ? (catalogError ? 'error' : 'catalog-loading') : !models.some((m) => value.modelSelection?.[m.id] !== false) ? 'no-models' : freshness === 'stale' ? 'stale' : 'ready'
     return {
       revision, ...(value.generation ? { generation: value.generation } : {}), ...(value.operationId ? { operationId: value.operationId } : {}),
@@ -111,7 +161,8 @@ export function installGateway(ctx, config, discover, readJson, previewKey) {
       keyConfigured, keyWritable: ctx.settings.writable !== false,
       modelSelection: value.modelSelection ?? {}, policy: safeObject(value.policy ?? {}), models,
       status, catalog: { freshness: loading ? 'loading' : freshness, ...(compatibleCatalog(value) ? { fetchedAt: catalog.fetchedAt } : {}), ...(catalogError ? { error: catalogError } : {}) },
-      diagnostics: [...diagnostics], ...(activationError ? { activationError } : {}), legacy: legacyView(ctx.settings),
+      diagnostics: [...diagnostics], ...(activationError ? { activationError } : {}), ...(recoveryError ? { recoveryError } : {}),
+      durable: saved, legacy: legacyView(ctx.settings),
     }
   }
   const load = async () => {
@@ -190,6 +241,7 @@ export function installGateway(ctx, config, discover, readJson, previewKey) {
       try { await writeCatalogCache(ctx.settings.documentPath, catalog) } catch { freshness = 'stale'; catalogError = errorView('CACHE_UNAVAILABLE', 'Catalog cache could not be saved') }
     }
     await activate()
+    await persist(current())
     const value = current()
     if (value.generation === generation && value.enabled !== false && value.authIdentity?.type !== 'missing') {
       const cfg = config()
@@ -244,6 +296,7 @@ export function installGateway(ctx, config, discover, readJson, previewKey) {
       const value = current()
       if (previous.generation !== value.generation) { cancelWake(); abortRefreshes(); failures = 0; catalog = undefined; freshness = 'empty'; catalogError = undefined }
       try { await refresh(value.generation, signal) } catch { await activate() }
+      await persist(current())
       return view()
     }
     if (input.type === 'save-selection') {
@@ -265,7 +318,19 @@ export function installGateway(ctx, config, discover, readJson, previewKey) {
       await cutoverLegacy(ctx.settings)
       const value = current()
       try { await refresh(value.generation, signal) } catch { }
-      if (current().migration?.phase !== 'active') activationError ??= errorView('MIGRATION_PENDING', 'Migration is prepared; refresh the catalog to finish activation')
+      if (current().migration?.phase !== 'active') recoveryError = errorView('MIGRATION_PENDING', 'Migration is prepared; refresh the catalog to finish activation')
+      return view()
+    }
+    if (input.type === 'restore-connection') {
+      if (typeof input.operationId !== 'string' || !input.operationId || input.operationId.length > 256) throw new ConnectionError('INVALID_REQUEST', 'An operation ID is required')
+      cancelWake(); abortRefreshes()
+      const generation = await restore(input.operationId, input.expectedRevision)
+      failures = 0
+      catalog = undefined
+      freshness = 'empty'
+      catalogError = undefined
+      recoveryError = undefined
+      try { await refresh(generation, signal) } catch { await activate() }
       return view()
     }
     if (input.type === 'rollback-legacy') {
@@ -276,6 +341,10 @@ export function installGateway(ctx, config, discover, readJson, previewKey) {
       catalog = undefined
       freshness = 'empty'
       activationError = undefined
+      recoveryError = undefined
+      try { await removeConnectionSnapshot(ctx.settings.documentPath) } catch { }
+      durable = undefined
+      durableLoaded = true
       return view()
     }
     throw new ConnectionError('INVALID_REQUEST', 'Unknown command')
@@ -306,7 +375,19 @@ export function installGateway(ctx, config, discover, readJson, previewKey) {
   ctx.on('credentials/record-updated', () => { void activate().catch(() => { }) })
   ctx.on('settings/document-updated', (ns) => { if (ns === NS) { const value = current(); if (value.enabled === false || value.authIdentity?.type === 'missing') { cancelWake(); abortRefreshes() } void activate().catch(() => { }) } })
   ctx.effect(() => () => { stopped = true; cancelWake(); abortRefreshes(); registration?.() })
+  // The plugin fiber is not marked ready while its apply runs, and the settings
+  // service only reports rows whose fiber is ready. Reading our row during that
+  // window throws and used to latch a recovery error for the whole process, so
+  // startup waits for the row instead of reporting a connection that is fine.
+  const whenAvailable = async () => {
+    for (let attempt = 0; attempt < 600; attempt++) {
+      if (stopped) return false
+      try { descriptor(); return true } catch { await new Promise((resolve) => setTimeout(resolve, 50)) }
+    }
+    return false
+  }
   void (async () => {
+    if (!(await whenAvailable())) return
     // A prepared migration means the process stopped between writing our row and
     // removing the legacy provider. Completing the cutover is the only forward
     // path; leaving it prepared would keep the route deactivated forever.
@@ -314,7 +395,17 @@ export function installGateway(ctx, config, discover, readJson, previewKey) {
     if (current().migration?.phase === 'cutover') await cutoverLegacy(ctx.settings)
     if (current().migration?.phase === 'rollback') await rollbackLegacy(ctx.settings, async () => { registration?.replace([]) })
     await load()
+    if (stopped) return
     const value = current()
+    // The profile patch file can be rebuilt or a row can be denied by a core
+    // gate, which erases the saved settings row. The plugin-owned snapshot is
+    // offered through state.durable and restore-connection instead of being
+    // applied implicitly, because an absent connection can also be deliberate.
+    await loadDurable()
     if (!stopped && value.baseURL && value.generation && value.enabled !== false && value.authIdentity?.type !== 'missing' && !['prepared', 'rollback'].includes(value.migration?.phase)) { controller = new AbortController(); try { await refresh(value.generation, controller.signal) } catch { } }
-  })().catch(() => { activationError = errorView('MIGRATION_PENDING', 'Connection recovery needs attention') })
+  })().catch(() => {
+    // Only a failure after the settings row became readable is a real recovery
+    // problem; a successful activation clears it again through activate().
+    recoveryError = errorView('MIGRATION_PENDING', 'Connection recovery needs attention')
+  })
 }
