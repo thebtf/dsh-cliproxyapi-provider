@@ -1,0 +1,92 @@
+{
+  "format": 1,
+  "title": {
+    "en": "thebtf DSH plugins",
+    "ru": "Плагины DSH от thebtf"
+  },
+  "description": {
+    "en": "DeepSeek Harness plugins maintained by thebtf.",
+    "ru": "Плагины DeepSeek Harness от thebtf."
+  },
+  "metadata": {
+    "categories": {
+      "integration": {
+        "title": {
+          "en": "Integrations"
+        }
+      },
+      "tools": {
+        "title": {
+          "en": "Tools"
+        }
+      }
+    },
+    "labels": {
+      "provider": {
+        "title": {
+          "en": "Model provider"
+        }
+      }
+    },
+    "sortKeys": {
+      "npm_weekly_downloads": {
+        "title": {
+          "en": "npm weekly downloads"
+        },
+        "order": "desc"
+      },
+      "github_stars": {
+        "title": {
+          "en": "GitHub stars"
+        },
+        "order": "desc"
+      }
+    }
+  },
+  "plugins": [
+    {
+      "name": "@router-for-me/dsh-cliproxyapi-provider",
+      "title": {
+        "en": "CLIProxyAPI provider"
+      },
+      "description": {
+        "en": "Connect a CLIProxyAPI server and import its model catalog. Pick the wire protocol (OpenAI Responses, Chat Completions, Anthropic Messages, Google Generative AI), choose which models are enabled, and keep the connection across restarts and core updates.",
+        "ru": "Подключение сервера CLIProxyAPI с импортом каталога моделей. Выбор протокола обмена (OpenAI Responses, Chat Completions, Anthropic Messages, Google Generative AI), выбор доступных моделей и сохранение подключения между перезапусками и обновлениями ядра."
+      },
+      "author": "thebtf",
+      "homepage": "https://github.com/thebtf/dsh-cliproxyapi-provider#readme",
+      "repository": {
+        "url": "https://github.com/thebtf/dsh-cliproxyapi-provider"
+      },
+      "icon": "icon.svg",
+      "metadata": {
+        "category": "integration",
+        "keywords": [
+          "cliproxyapi",
+          "provider",
+          "openai",
+          "anthropic",
+          "google",
+          "gateway"
+        ],
+        "labels": [
+          "provider"
+        ]
+      },
+      "versions": [
+        {
+          "version": "0.4.3",
+          "publishTimestamp": 1794617476,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/thebtf/dsh-cliproxyapi-provider",
+            "commit": "4a2729c19a638db474b65089afefcdf2eaa5d02e"
+          },
+          "engines": {
+            "dsh": "^0.2.2-rc.2"
+          }
+        }
+      ]
+    }
+  ]
+}
