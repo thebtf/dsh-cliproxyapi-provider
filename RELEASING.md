@@ -64,10 +64,10 @@ Actions — with:
 or from the terminal:
 
 ```powershell
-npm trust github @router-for-me/dsh-cliproxyapi-provider `
+npm trust github @thebtf/dsh-cliproxyapi-provider `
   --file publish.yml --repo thebtf/dsh-cliproxyapi-provider `
   --allow-publish
-npm trust list @router-for-me/dsh-cliproxyapi-provider
+npm trust list @thebtf/dsh-cliproxyapi-provider
 ```
 
 `npm trust` requires npm 11.15.0+, write access to the package and 2FA enabled

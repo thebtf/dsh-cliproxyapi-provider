@@ -45,7 +45,7 @@
   },
   "plugins": [
     {
-      "name": "@router-for-me/dsh-cliproxyapi-provider",
+      "name": "@thebtf/dsh-cliproxyapi-provider",
       "title": {
         "en": "CLIProxyAPI provider"
       },
