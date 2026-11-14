@@ -75,12 +75,22 @@
       },
       "versions": [
         {
-          "version": "0.4.3",
-          "publishTimestamp": 1794617476,
+          "version": "0.4.4",
+          "publishTimestamp": 1794624257,
           "source": {
-            "type": "git",
-            "url": "https://github.com/thebtf/dsh-cliproxyapi-provider",
-            "commit": "4a2729c19a638db474b65089afefcdf2eaa5d02e"
+            "type": "npm",
+            "registry": "https://registry.npmjs.org"
+          },
+          "engines": {
+            "dsh": "^0.2.2-rc.2"
+          }
+        },
+        {
+          "version": "0.4.3",
+          "publishTimestamp": 1794623611,
+          "source": {
+            "type": "npm",
+            "registry": "https://registry.npmjs.org"
           },
           "engines": {
             "dsh": "^0.2.2-rc.2"
