@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { credentialKey, credentialRef } from '@deepseek-ai/dsh-credentials'
+import { canonicalEndpoint } from './endpoint.js'
 
 const NS = 'llm-cliproxyapi'
 
@@ -24,6 +25,13 @@ export function validateEndpoint(input) {
   return input
 }
 
+// A connection saved by an older build may still hold a trailing /v1, so every
+// stored value is compared through the same canonicalisation as fresh input.
+function storedEndpoint(value) {
+  if (typeof value !== 'string' || !value.trim()) return undefined
+  try { return canonicalEndpoint(value) } catch { return value }
+}
+
 function descriptor(settings) {
   const result = settings.describe().find((row) => row.ns === NS)
   if (!result || !Number.isSafeInteger(result.revision)) throw new ConnectionError('SETTINGS_UNAVAILABLE', 'Connection settings are unavailable')
@@ -45,7 +53,7 @@ export async function saveConnection(settings, credentials, input) {
   if (!Number.isSafeInteger(input.expectedRevision)) throw new ConnectionError('SETTINGS_CONFLICT', 'Connection settings have changed')
   if (typeof input.operationId !== 'string' || !input.operationId || input.operationId.length > 256) throw new ConnectionError('INVALID_OPERATION', 'An operation ID is required')
   if (current.value?.operationId === input.operationId) {
-    const same = current.value.baseURL === input.baseURL && JSON.stringify(current.value.policy ?? {}) === JSON.stringify(input.policy ?? current.value.policy ?? {}) && Object.entries(input.selectionChanges ?? {}).every(([id, selected]) => current.value.modelSelection?.[id] === selected)
+    const same = storedEndpoint(current.value.baseURL) === storedEndpoint(input.baseURL) && JSON.stringify(current.value.policy ?? {}) === JSON.stringify(input.policy ?? current.value.policy ?? {}) && Object.entries(input.selectionChanges ?? {}).every(([id, selected]) => current.value.modelSelection?.[id] === selected)
     if (!same) throw new ConnectionError('OPERATION_CONFLICT', 'Operation ID was already used for a different draft')
     const identity = current.value.authIdentity
     if (input.authEdit?.type === 'none' && identity?.type !== 'none' || input.authEdit?.type === 'reference' && (identity?.type !== 'reference' || identity.ref !== input.authEdit.ref) || input.authEdit?.type === 'replace' && (identity?.type !== 'record' || await resolveIdentity(credentials, identity) !== input.authEdit.key)) throw new ConnectionError('OPERATION_CONFLICT', 'Operation ID was already used for a different draft')
@@ -60,13 +68,13 @@ export async function saveConnection(settings, credentials, input) {
   let identity
   if (edit.type === 'keep') {
     if (!previous.authIdentity) throw new ConnectionError('INVALID_AUTH', 'There is no existing identity to retain')
-    if (previous.baseURL && previous.baseURL !== baseURL && edit.allowEndpointReuse !== true) throw new ConnectionError('AUTH_REUSE_REQUIRED', 'Credential reuse on a new endpoint requires consent')
+    if (previous.baseURL && storedEndpoint(previous.baseURL) !== storedEndpoint(baseURL) && edit.allowEndpointReuse !== true) throw new ConnectionError('AUTH_REUSE_REQUIRED', 'Credential reuse on a new endpoint requires consent')
     identity = previous.authIdentity
   } else if (edit.type === 'none') {
     identity = { type: 'none' }
   } else if (edit.type === 'reference') {
     try { identity = { type: 'reference', ref: credentialRef(edit.ref) } } catch { throw new ConnectionError('INVALID_AUTH', 'Invalid credential reference') }
-    if (previous.baseURL && previous.baseURL !== baseURL && previous.authIdentity?.type === 'reference' && previous.authIdentity.ref === identity.ref && edit.allowEndpointReuse !== true) throw new ConnectionError('AUTH_REUSE_REQUIRED', 'Credential reuse on a new endpoint requires consent')
+    if (previous.baseURL && storedEndpoint(previous.baseURL) !== storedEndpoint(baseURL) && previous.authIdentity?.type === 'reference' && previous.authIdentity.ref === identity.ref && edit.allowEndpointReuse !== true) throw new ConnectionError('AUTH_REUSE_REQUIRED', 'Credential reuse on a new endpoint requires consent')
   } else if (edit.type === 'replace') {
     if (typeof edit.key !== 'string' || !edit.key.trim()) throw new ConnectionError('INVALID_AUTH', 'A non-empty key is required')
     const id = 'op-' + createHash('sha256').update(input.operationId).digest('hex')

@@ -1,6 +1,6 @@
 {
   "name": "@thebtf/dsh-cliproxyapi-provider",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "GUI-configurable CLIProxyAPI provider for DeepSeek Harness with a selectable wire protocol",
   "type": "module",
   "main": "./src/index.js",

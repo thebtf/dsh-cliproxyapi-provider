@@ -8,6 +8,7 @@ import { catalogURL, readCodexCatalogWithMetadata } from './catalog.js'
 import { installGateway } from './gateway.js'
 import { protocolOf } from './policy.js'
 import { ConnectionError, resolveIdentity, validateEndpoint } from './connection.js'
+import { canonicalEndpoint } from './endpoint.js'
 
 const MAX_CATALOG_BYTES = 4 * 1024 * 1024
 const DISCOVERY_HANDOFF_TTL_MS = 60_000
@@ -57,6 +58,16 @@ function normalizedBaseURL(value) {
     throw new TypeError('CLIProxyAPI baseURL must use http or https')
   }
   return baseURL
+}
+
+// Two spellings of the same server (".../v1" and the bare root) must resolve to
+// one identity, so endpoint comparisons always go through the canonical root.
+function sameEndpoint(left, right) {
+  try {
+    return canonicalEndpoint(left) === canonicalEndpoint(right)
+  } catch {
+    return left === right
+  }
 }
 
 function headerKey(headers, expected) {
@@ -330,14 +341,14 @@ export function apply(ctx, config) {
     const settings = ctx.settings.describe()
     const own = settings.find((entry) => entry.ns === DISCOVERY_NS)?.value
     if (own?.baseURL && own.authIdentity) {
-      if (own.baseURL !== endpoint && allowEndpointReuse !== true) return ''
+      if (!sameEndpoint(own.baseURL, endpoint) && allowEndpointReuse !== true) return ''
       if (own.authIdentity.type === 'missing') throw new ConnectionError('MISSING_CREDENTIAL', 'CPA credential is missing')
       const key = await resolveIdentity(ctx.credentials, own.authIdentity)
       if (own.authIdentity.type !== 'none' && !key) throw new ConnectionError('MISSING_CREDENTIAL', 'CPA credential is missing')
       return key ?? ''
     }
     const legacy = settings.find((entry) => entry.ns === PI_NS)?.value?.providers?.[PROVIDER]
-    if (legacy?.baseURL === endpoint) return (await optionalApiKey(ctx)) ?? ''
+    if (legacy?.baseURL && sameEndpoint(legacy.baseURL, endpoint)) return (await optionalApiKey(ctx)) ?? ''
     return ''
   }
 

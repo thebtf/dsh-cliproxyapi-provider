@@ -43,6 +43,16 @@ export function terminalStage(protocol, line) {
   return TERMINALS[resolveProtocol(protocol)](line)
 }
 
+// The Google Generative AI adapter rejects any fetch that is not globalThis.fetch
+// (pi-ai google-generative-ai.js: "Custom fetch is not supported by the Google
+// Generative AI adapter"), so that one protocol keeps the runtime fetch and its
+// diagnostics panel records no http stage. It also carries its key in
+// x-goog-api-key rather than Authorization, so the keyless scrub it would lose
+// does not apply to it.
+export function usesScopedFetch(api) {
+  return resolveProtocol(api) !== 'google-generative-ai'
+}
+
 export function createTransport(protocol, baseURL, diagnostics, fetchImpl = globalThis.fetch, keyless = false) {
   const api = resolveProtocol(protocol)
   const origin = new URL(baseURL).origin
@@ -92,10 +102,14 @@ export function createTransport(protocol, baseURL, diagnostics, fetchImpl = glob
       throw error
     }
   }
+  // The Google Generative AI adapter refuses any fetch that is not globalThis.fetch,
+  // so for that protocol the scoped wrapper cannot be installed: the call goes out
+  // through the runtime fetch and the diagnostics panel records no http stage. The
+  // origin guard is not needed there because the base URL is the one we publish.
   const withPolicy = (options) => ({
     ...options,
     maxRetries: 0,
-    fetch: scopedFetch,
+    ...(usesScopedFetch(api) ? { fetch: scopedFetch } : {}),
     onPayload(payload, model) {
       const applyPolicy = (value) => {
         const updated = { ...value }
