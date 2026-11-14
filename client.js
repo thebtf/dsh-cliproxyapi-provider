@@ -117,6 +117,9 @@ window.__ModuleLoader__.load({
 
     Object.assign(copy.en, { protocol: 'Wire protocol', protocolHelp: 'How DSH talks to this gateway. It must match what the server exposes; the model catalog is read the same way for every protocol.', protocolResponses: 'OpenAI Responses', protocolCompletions: 'OpenAI Chat Completions', protocolAnthropic: 'Anthropic Messages', protocolGoogle: 'Google Generative AI' })
     Object.assign(copy.ru, { protocol: 'Протокол обмена', protocolHelp: 'Как DSH обращается к шлюзу. Должен совпадать с тем, что предоставляет сервер; каталог моделей запрашивается одинаково для всех протоколов.', protocolResponses: 'OpenAI Responses', protocolCompletions: 'OpenAI Chat Completions', protocolAnthropic: 'Anthropic Messages', protocolGoogle: 'Google Generative AI' })
+    Object.assign(copy.en, { restoreSaved: 'Restore saved connection', restoreHelp: 'A copy of the last saved connection is kept by the plugin, outside the profile. Use it when the profile was rebuilt or the settings entry disappeared.', restoreMissing: 'No saved connection to restore.', recoveryWarn: 'Recovery', durableSaved: 'Saved copy' })
+    Object.assign(copy.ru, { restoreSaved: 'Восстановить сохранённое подключение', restoreHelp: 'Плагин хранит копию последнего сохранённого подключения вне профиля. Пригодится, если профиль пересобрали или запись настроек пропала.', restoreMissing: 'Нет сохранённого подключения для восстановления.', recoveryWarn: 'Восстановление', durableSaved: 'Сохранённая копия' })
+    Object.assign(copy.zh, { restoreSaved: '恢复已保存的连接', restoreHelp: '插件在配置文件之外保留上次保存连接的副本。当配置文件重建或设置条目消失时可用。', restoreMissing: '没有可恢复的已保存连接。', recoveryWarn: '恢复', durableSaved: '已保存副本' })
     Object.assign(copy.zh, { protocol: '通信协议', protocolHelp: 'DSH 与该网关通信的方式，必须与服务端提供的协议一致；模型目录对所有协议使用同一地址。', protocolResponses: 'OpenAI Responses', protocolCompletions: 'OpenAI Chat Completions', protocolAnthropic: 'Anthropic Messages', protocolGoogle: 'Google Generative AI' })
 
     // The page body sits inside the Host's plugin page, which already draws the
@@ -402,6 +405,7 @@ window.__ModuleLoader__.load({
             React.createElement('p', { className: 'cpa-status-text', role: 'status' }, state ? t(statusKeys[state.status] || 'statusError') : t('loading')),
           ),
           snapshot?.status === 'ready' && !snapshot.writable ? note(t('readOnly')) : null,
+          state?.recoveryError ? note(t('recoveryWarn') + ': ' + state.recoveryError.message, 'warn') : null,
           state?.activationError ? React.createElement('p', { className: 'cpa-note', 'data-tone': 'error', role: 'alert' }, t('activationFailed'), ' ', state.activationError.code, state.activationError.message ? ' — ' + state.activationError.message : '') : null,
           state?.catalog?.error ? note(t(Object.hasOwn(catalogErrorKeys, state.catalog.error.code) ? catalogErrorKeys[state.catalog.error.code] : 'catalogError'), 'warn') : null,
           (state?.diagnostics || []).map((diagnostic, index) => diagnosticView(diagnostic, index, t)),
@@ -465,8 +469,10 @@ window.__ModuleLoader__.load({
               React.createElement(Button, { type: 'submit', variant: 'primary', disabled: !writable }, t('save')),
               button('saveSelection', () => mutate('save-selection', { selectionChanges: draft }), !writable, 'outline'),
               button(state?.enabled ? 'disconnect' : 'enableConnection', () => mutate('set-enabled', { enabled: !state.enabled }), !writable || !state?.configured),
+              !state?.baseURL && state?.durable?.available ? button('restoreSaved', () => mutate('restore-connection'), !writable, 'outline') : null,
             ),
             React.createElement('p', { className: 'cpa-note', role: 'note' }, t('disconnectHelp')),
+            React.createElement('p', { className: 'cpa-note', role: 'note' }, state?.durable?.available ? t('restoreHelp') : t('restoreMissing')),
             React.createElement('div', { className: 'cpa-actions' },
               button('forgetKey', () => mutate('forget-key'), !writable || !state?.keyConfigured),
               state?.legacy?.available ? button('importLegacy', () => mutate('import-legacy', { expectedLegacyRevision: state.legacy.revision, fingerprint: state.legacy.fingerprint })) : null,

@@ -28,13 +28,19 @@ test('manifest declares an engines.dsh range so core updates do not disable the 
   assert.equal(manifest.engines.dsh.includes('workspace:'), false)
 })
 
-test('every pinned DSH package agrees with the declared support range', () => {
+test('every DSH package accepts newer builds on the supported core line', () => {
   const pinned = [
     ...Object.entries(manifest.peerDependencies ?? {}),
     ...Object.entries(manifest.dependencies ?? {}),
     ...Object.entries(manifest.devDependencies ?? {}),
   ].filter(([name]) => DSH_PACKAGES.includes(name))
   assert.equal(pinned.length, DSH_PACKAGES.length)
-  const versions = new Set(pinned.map(([, range]) => range))
-  assert.deepEqual([...versions], ['0.2.2-rc.2'])
+  // Exact pins turned a core prerelease bump into a disabled plugin: the
+  // profile then held a version skew that app-boot refused. A caret range on
+  // the same core line lets the host satisfy the requirement with whatever
+  // build of 0.2.2 it ships, without a new plugin release.
+  for (const [name, range] of pinned) {
+    assert.equal(range, '^0.2.2-rc.2', name + ' must accept newer 0.2.2 builds')
+  }
+  assert.equal(manifest.engines.dsh, '^0.2.2-rc.2')
 })
