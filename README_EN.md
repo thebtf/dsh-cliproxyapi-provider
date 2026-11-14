@@ -6,6 +6,12 @@ The plugin connects one CLIProxyAPI gateway to DeepSeek Harness. You choose the 
 
 ## Install and configure
 
+The plugin is listed in its own DSH plugin market index. Add the index once, then install and update from **Plugins → Discover**:
+
+```
+https://raw.githubusercontent.com/thebtf/dsh-cliproxyapi-provider/main/market/index.json
+```
+
 Requires Node.js 24.9.0 or newer and DeepSeek Harness 0.2.2-rc.3 (`engines.dsh` accepts the 0.2.x line, so a minor core update does not disable the plugin). Install the version tag or use the moving GitHub channel:
 
 ```powershell
@@ -30,4 +36,4 @@ An existing generic CLIProxyAPI profile owns its route until the plugin takes it
 
 The Models footer shows CPA status and **Open Plugins**. Open Plugins, then select **CLIProxyAPI** to reach its settings. This is not a complete owner-controlled row in the main Models provider list; native Edit/Delete there are not CPA lifecycle actions.
 
-The `latest` channel requires a GitHub-aware updater; the DSH 0.2.2-rc.3 native Versions UI updates registry installations only. No npm publication is implied. Uninstall with `npx @deepseek-ai/dsh plugin --profile web remove @router-for-me/dsh-cliproxyapi-provider` and restart; uninstall does not promise deletion of saved configuration.
+The `latest` channel requires a GitHub-aware updater. The market index pins an exact commit per version, so installing through the index gives the market a stable origin it can compare and update. Publishing to npm is wired to GitHub Releases (see `.github/workflows/publish.yml`); the native Versions UI updates registry installations only, and npm publication depends on the repository `NPM_TOKEN` secret being configured. Uninstall with `npx @deepseek-ai/dsh plugin --profile web remove @router-for-me/dsh-cliproxyapi-provider` and restart; uninstall does not promise deletion of saved configuration.
