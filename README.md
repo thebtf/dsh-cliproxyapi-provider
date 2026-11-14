@@ -15,13 +15,13 @@ https://raw.githubusercontent.com/thebtf/dsh-cliproxyapi-provider/main/market/in
 需要 Node.js 24.9.0 或更新版本和 DeepSeek Harness 0.2.2-rc.3（`engines.dsh` 允许 0.2.x 系列，核心小版本更新不会停用插件）。插件已发布到 npm，安装与升级就是普通安装：
 
 ```powershell
-npx @deepseek-ai/dsh plugin --profile web add '@thebtf/dsh-cliproxyapi-provider@0.4.4'
+npx @deepseek-ai/dsh plugin --profile web add '@thebtf/dsh-cliproxyapi-provider@0.4.5'
 npx @deepseek-ai/dsh web
 ```
 
-下面的市场索引指向同一批 npm 版本；按 GitHub 标签安装仍然可用：`github:thebtf/dsh-cliproxyapi-provider#v0.4.4`。
+下面的市场索引指向同一批 npm 版本；按 GitHub 标签安装仍然可用：`github:thebtf/dsh-cliproxyapi-provider#v0.4.5`。
 
-安装或升级后重启 Web 或 Desktop。在侧边栏 **插件** 页面选择 **CLIProxyAPI**，先选择网关提供的通信协议，再填写实际地址；不会自动假定本地地址。模型目录对所有协议都从同一个 `/models` 地址读取。明确选择保留身份、替换密钥、使用凭据引用或不使用验证。HTTP 不加密，密钥和请求可能泄露；对新地址重用已有身份需要明确同意。
+安装或升级后重启 Web 或 Desktop。在侧边栏 **插件** 页面选择 **CLIProxyAPI**，先选择网关提供的通信协议，再填写服务器地址；不会自动假定本地地址。末尾的 `/v1` 可写可不写：插件统一从 `{root}/v1/models` 读取模型目录，并按各协议自动补上各自 SDK 需要的路径（无、`/v1` 或 `/v1beta`）。明确选择保留身份、替换密钥、使用凭据引用或不使用验证。HTTP 不加密，密钥和请求可能泄露；对新地址重用已有身份需要明确同意。
 
 ![DeepSeek Harness 中的 CLIProxyAPI 设置页](market/screenshot-settings.png)
 

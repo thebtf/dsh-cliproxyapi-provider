@@ -1,6 +1,6 @@
 # CLIProxyAPI for DeepSeek Harness
 
-Open **Plugins**, then select **CLIProxyAPI**. Choose the wire protocol your gateway exposes — OpenAI Responses, OpenAI Chat Completions, Anthropic Messages or Google Generative AI — then enter your actual endpoint and explicitly choose keep, replace, reference, or no authentication. HTTP is unencrypted. A changed endpoint cannot reuse saved credentials without consent.
+Open **Plugins**, then select **CLIProxyAPI**. Choose the wire protocol your gateway exposes — OpenAI Responses, OpenAI Chat Completions, Anthropic Messages or Google Generative AI — then enter your actual server address and explicitly choose keep, replace, reference, or no authentication. A trailing `/v1` is optional: with or without it the catalog is read from `{root}/v1/models`, and each protocol receives the base its own SDK expects. HTTP is unencrypted. A changed endpoint cannot reuse saved credentials without consent.
 
 Preview models, search or select all/deselect all, then save the connection, policy and model draft together. Zero selected models is valid but not ready. Details show metadata, source labels and advertised reasoning efforts. A stale catalog can remain available after a refresh failure. Save and activation are reported separately.
 

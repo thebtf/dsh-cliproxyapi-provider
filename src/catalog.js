@@ -1,4 +1,5 @@
 import { credentialField } from './secrets.js'
+import { catalogEndpoint } from './endpoint.js'
 
 const CANONICAL_REASONING_LEVELS = new Set([
   'off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
@@ -119,11 +120,10 @@ export function readCodexCatalog(body, options = {}) {
   return readCodexCatalogWithMetadata(body, options).models
 }
 
+// The catalog lives at {root}/v1/models for every protocol, so a base that
+// already carries /v1 is accepted and resolves to the same URL.
 export function catalogURL(baseURL) {
-  const base = String(baseURL ?? '').trim()
-  if (!base) throw new TypeError('CLIProxyAPI baseURL must not be empty')
-  const url = new URL(base)
-  url.pathname = url.pathname.replace(/\/+$/, '') + '/models'
+  const url = new URL(catalogEndpoint(baseURL))
   url.searchParams.set('client_version', 'dsh-cliproxyapi-provider')
   return url.toString()
 }

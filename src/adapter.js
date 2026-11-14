@@ -2,6 +2,7 @@ import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
 import { LlmError, resolveImageAttachmentAccess, resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
 import { createProvider, InMemoryCredentialStore, defaultProviderAuthContext } from '@earendil-works/pi-ai'
 import { createTransport } from './transport.js'
+import { baseURLFor } from './endpoint.js'
 import { resolveIdentity } from './connection.js'
 import { protocolOf } from './policy.js'
 
@@ -13,24 +14,28 @@ export function createGatewayAdapter(ctx, snapshot, diagnostics, onMissing = () 
   const update = (next) => {
     const captured = structuredClone(next)
     const protocol = protocolOf(captured.policy)
+    // Each SDK appends its own path to the base it receives, so the model and
+    // provider publish the base their protocol needs while the stored value
+    // stays exactly what the user entered.
+    const protocolBase = baseURLFor(captured.baseURL, protocol)
     const models = captured.models.filter((model) => captured.modelSelection?.[model.id] !== false).map((model) => {
       const efforts = model.reasoningEfforts
       const thinkingLevelMap = efforts && Object.fromEntries(LEVELS.flatMap((level) => efforts[level] === undefined ? [[level, null]] : efforts[level] === null ? [] : [[level, efforts[level]]]))
       return {
         id: model.id, name: model.name ?? model.id, provider: PROVIDER, api: protocol,
-        baseUrl: captured.baseURL, reasoning: !!efforts, ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
+        baseUrl: protocolBase, reasoning: !!efforts, ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
         input: model.inputModalities ?? model.input ?? ['text'], contextWindow: model.contextWindow,
         maxTokens: model.maxTokens, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         compat: { ...captured.policy?.compat, ...model.compat, supportsStrictMode: true },
       }
     })
     const piProvider = createProvider({
-      id: PROVIDER, name: PROVIDER, baseUrl: captured.baseURL, models,
+      id: PROVIDER, name: PROVIDER, baseUrl: protocolBase, models,
       auth: { apiKey: { name: 'DSH key resolver', resolve: async ({ credential }) => ({ auth: { apiKey: credential?.key ?? 'cpa-keyless' }, source: 'DSH' }) } },
       api: createTransport(protocol, captured.baseURL, diagnostics, globalThis.fetch, captured.authIdentity?.type === 'none'),
     })
     const profile = {
-      provider: PROVIDER, displayName: PROVIDER, baseURL: captured.baseURL, piProvider, api: protocol,
+      provider: PROVIDER, displayName: PROVIDER, baseURL: protocolBase, piProvider, api: protocol,
       authIdentity: captured.authIdentity, headers: captured.policy?.headers,
       reasoning: captured.policy?.reasoning, thinkingBudgets: captured.policy?.thinkingBudgets,
       cacheRetention: captured.policy?.cacheRetention, transport: captured.policy?.transport,

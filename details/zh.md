@@ -1,6 +1,6 @@
 # DeepSeek Harness 的 CLIProxyAPI
 
-打开 **插件**，然后选择 **CLIProxyAPI**。先选择网关提供的通信协议（OpenAI Responses、OpenAI Chat Completions、Anthropic Messages 或 Google Generative AI），再输入实际地址，并明确选择保留、替换密钥、凭据引用或不验证。HTTP 不加密。更换地址后，重用保存的凭据需要明确同意。
+打开 **插件**，然后选择 **CLIProxyAPI**。先选择网关提供的通信协议（OpenAI Responses、OpenAI Chat Completions、Anthropic Messages 或 Google Generative AI），再输入实际服务器地址，并明确选择保留、替换密钥、凭据引用或不验证。末尾的 `/v1` 可写可不写：两种写法都从 `{root}/v1/models` 读取模型目录，各协议会自动使用自己 SDK 需要的地址。HTTP 不加密。更换地址后，重用保存的凭据需要明确同意。
 
 预览目录后搜索、选择或批量选择模型。保存同时提交连接、策略和模型草稿。允许零模型，但连接尚未就绪。详情展示元数据、来源和已声明的推理等级；刷新失败后，上次目录可能标为过期。保存和激活分别显示。
 
