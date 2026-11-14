@@ -12,13 +12,14 @@ The plugin is listed in its own DSH plugin market index. Add the index once, the
 https://raw.githubusercontent.com/thebtf/dsh-cliproxyapi-provider/main/market/index.json
 ```
 
-Requires Node.js 24.9.0 or newer and DeepSeek Harness 0.2.2-rc.3 (`engines.dsh` accepts the 0.2.x line, so a minor core update does not disable the plugin). Install the version tag or use the moving GitHub channel:
+Requires Node.js 24.9.0 or newer and DeepSeek Harness 0.2.2-rc.3 (`engines.dsh` accepts the 0.2.x line, so a minor core update does not disable the plugin). The plugin is published to npm, so installing and updating is a normal package install:
 
 ```powershell
-npx @deepseek-ai/dsh plugin --profile web add 'github:thebtf/dsh-cliproxyapi-provider#v0.4.3'
-# Moving channel: github:thebtf/dsh-cliproxyapi-provider#latest
+npx @deepseek-ai/dsh plugin --profile web add '@thebtf/dsh-cliproxyapi-provider@0.4.4'
 npx @deepseek-ai/dsh web
 ```
+
+The market index below points at the same npm releases; a GitHub tag install still works: `github:thebtf/dsh-cliproxyapi-provider#v0.4.4`.
 
 Restart the Web process or Desktop after installation or upgrade. On the sidebar **Plugins** page, choose **CLIProxyAPI**. Pick the wire protocol your gateway exposes, then enter the actual Base URL; no local address is assumed. The model catalog is read from the same `/models` endpoint for every protocol. Choose whether to keep the existing credential, replace it, use a reference, or explicitly use no authentication. HTTP is unencrypted: keys and request contents can be exposed. Reusing an existing identity with a changed endpoint requires explicit consent.
 
