@@ -1,0 +1,46 @@
+name: publish
+
+# Publishes the plugin to npm whenever a GitHub Release is published.
+# The repository secret NPM_TOKEN must hold an npm automation token
+# with publish access to the @router-for-me scope.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  npm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: npm ci || npm install
+      - run: npm run check
+      - name: Verify the release tag matches the manifest
+        if: github.event_name == 'release'
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "v$VERSION" ]; then
+            echo "release tag $TAG does not match package.json version $VERSION" >&2
+            exit 1
+          fi
+      - name: Publish
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if npm view "$PACKAGE_NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "$PACKAGE_NAME@$VERSION is already published; skipping" >&2
+          else
+            npm publish --access public --provenance
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PACKAGE_NAME: @router-for-me/dsh-cliproxyapi-provider

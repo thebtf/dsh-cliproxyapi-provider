@@ -1,7 +1,7 @@
 {
   "name": "@router-for-me/dsh-cliproxyapi-provider",
   "version": "0.4.3",
-  "description": "GUI-configurable CLIProxyAPI Responses provider for DeepSeek Harness",
+  "description": "GUI-configurable CLIProxyAPI provider for DeepSeek Harness with a selectable wire protocol",
   "type": "module",
   "main": "./src/index.js",
   "exports": {
@@ -71,6 +71,15 @@
     "node": ">=24.9.0",
     "dsh": "^0.2.2-rc.2"
   },
-  "license": "MIT",
-  "private": true
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cliproxyapi",
+    "llm"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT"
 }
