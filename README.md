@@ -36,4 +36,4 @@ npx @deepseek-ai/dsh web
 
 Models 页底部显示 CPA 状态和 **打开插件**。点击后再选择 **CLIProxyAPI** 进入设置。这不是 Models 主列表中的完整自主管理行；其中原生编辑／删除操作不是 CPA 生命周期操作。
 
-`latest` 通道需要支持 GitHub 的更新器。市场索引为每个版本固定了一个确切提交，因此通过索引安装后市场有了可比较、可更新的稳定来源。npm 发布已接入 GitHub Releases（见 `.github/workflows/publish.yml`）；原生 Versions 只更新 registry 安装，npm 发布取决于仓库是否配置了 `NPM_TOKEN` 密钥。卸载命令：`npx @deepseek-ai/dsh plugin --profile web remove @router-for-me/dsh-cliproxyapi-provider`，然后重启；卸载不承诺删除已保存配置。
+`latest` 通道需要支持 GitHub 的更新器。市场索引为每个版本固定了一个确切提交，因此通过索引安装后市场有了可比较、可更新的稳定来源。npm 发布已接入 GitHub Releases（见 `.github/workflows/publish.yml`）；原生 Versions 只更新 registry 安装；npm 发布使用 npm trusted publishing（OIDC）认证，仓库中不保存任何令牌，首次配置见 [RELEASING.md](RELEASING.md)。卸载命令：`npx @deepseek-ai/dsh plugin --profile web remove @router-for-me/dsh-cliproxyapi-provider`，然后重启；卸载不承诺删除已保存配置。
