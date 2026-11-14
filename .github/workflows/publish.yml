@@ -1,46 +1,102 @@
 name: publish
 
 # Publishes the plugin to npm whenever a GitHub Release is published.
-# The repository secret NPM_TOKEN must hold an npm automation token
-# with publish access to the @router-for-me scope.
+#
+# Authentication uses npm trusted publishing (OIDC): GitHub mints a
+# short-lived credential for this exact workflow, so the repository stores
+# no npm token at all. Provenance attestations are generated automatically.
+#
+# One-time npm setup (see RELEASING.md):
+#   1. the package must exist on npm already - npm cannot attach a trusted
+#      publisher to a name that nobody has published;
+#   2. add a GitHub Actions trusted publisher for this repository with the
+#      workflow filename `publish.yml` and the "npm publish" action allowed.
 
 on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Pack and verify the release without publishing it
+        type: boolean
+        default: false
 
 permissions:
   contents: read
   id-token: write
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
 
 jobs:
   npm:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Use an npm CLI that speaks trusted publishing
+        run: |
+          npm install --global npm@^11.15.0
+          npm --version
+
+      - name: Drop the placeholder token line so the OIDC exchange can run
+        # setup-node writes "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}"
+        # into .npmrc. With no token secret configured that expands to an empty
+        # value, npm then believes the registry is already authenticated and
+        # skips the OIDC exchange, failing with ENEEDAUTH or a 404.
+        run: |
+          npmrc="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+          if [ -f "$npmrc" ]; then
+            sed -i '/_authToken/d' "$npmrc"
+          fi
+
       - run: npm ci || npm install
+
       - run: npm run check
+
       - name: Verify the release tag matches the manifest
         if: github.event_name == 'release'
         run: |
-          TAG="${{ github.event.release.tag_name }}"
-          VERSION="$(node -p "require('./package.json').version")"
-          if [ "$TAG" != "v$VERSION" ]; then
-            echo "release tag $TAG does not match package.json version $VERSION" >&2
+          tag="${{ github.event.release.tag_name }}"
+          version="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "v$version" ]; then
+            echo "release tag $tag does not match package.json version $version" >&2
             exit 1
           fi
+
       - name: Publish
-        run: |
-          VERSION="$(node -p "require('./package.json').version")"
-          if npm view "$PACKAGE_NAME@$VERSION" version >/dev/null 2>&1; then
-            echo "$PACKAGE_NAME@$VERSION is already published; skipping" >&2
-          else
-            npm publish --access public --provenance
-          fi
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          PACKAGE_NAME: @router-for-me/dsh-cliproxyapi-provider
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          package="$(node -p "require('./package.json').name")"
+          version="$(node -p "require('./package.json').version")"
+          echo "package: $package@$version"
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "dry run: packing without publishing"
+            npm publish --access public --dry-run
+            exit 0
+          fi
+
+          # npm has no pending-publisher flow: a trusted publisher can only be
+          # attached to a package that already exists on the registry, so the
+          # very first version has to be published once by a maintainer.
+          if ! npm view "$package" name >/dev/null 2>&1; then
+            echo "::error title=First publish must be manual::$package is not on npm yet. Publish it once by hand, then add the trusted publisher; every later release goes through this workflow."
+            exit 1
+          fi
+
+          if npm view "$package@$version" version >/dev/null 2>&1; then
+            echo "$package@$version is already published; nothing to do"
+            exit 0
+          fi
+
+          npm publish --access public --provenance
