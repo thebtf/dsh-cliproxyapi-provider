@@ -23,6 +23,8 @@ The market index below points at the same npm releases; a GitHub tag install sti
 
 Restart the Web process or Desktop after installation or upgrade. On the sidebar **Plugins** page, choose **CLIProxyAPI**. Pick the wire protocol your gateway exposes, then enter the actual Base URL; no local address is assumed. The model catalog is read from the same `/models` endpoint for every protocol. Choose whether to keep the existing credential, replace it, use a reference, or explicitly use no authentication. HTTP is unencrypted: keys and request contents can be exposed. Reusing an existing identity with a changed endpoint requires explicit consent.
 
+![The CLIProxyAPI settings page in DeepSeek Harness](market/screenshot-settings.png)
+
 Preview the catalog, search, and select models; bulk controls affect the whole loaded catalog. Save commits the address, authentication action, policy, and model draft together. Saving zero models is allowed but leaves the native route unavailable. Absent model choices are retained and newly discovered models default to enabled. Metadata, capability sources and reported reasoning efforts are available in model details. A failed refresh preserves the last good catalog as stale. A saved configuration is not proof of successful activation.
 
 The plugin also keeps a copy of the last saved connection outside the profile. If a profile rebuild, a core compatibility gate, or a reinstall removes the settings entry, the page offers **Restore saved connection**, so the address and credential do not have to be entered again.
