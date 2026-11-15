@@ -293,8 +293,10 @@ window.__ModuleLoader__.load({
     }
 
     function SettingsTab({ t, view, useScope }) {
-      if (view === 'summary') return t('intro')
+      // Hooks stay unconditional: the summary view is the same component, and a
+      // guard above the hooks changes the hook count when the host switches view.
       const snapshot = useScope((value) => value)
+      const viewMode = view === 'summary'
       const [state, setState] = useState(null)
       const [baseURL, setBaseURL] = useState('')
       const [apiKey, setApiKey] = useState('')
@@ -313,6 +315,8 @@ window.__ModuleLoader__.load({
       const requestGeneration = React.useRef(0)
       const writable = snapshot?.status === 'ready' && snapshot.writable && state && !busy && !pending
       useEffect(() => {
+        // The summary view renders one line, so it does not pay for the read.
+        if (viewMode) return undefined
         let active = true
         readState().then((value) => {
           if (!active) return
@@ -320,7 +324,7 @@ window.__ModuleLoader__.load({
           setProtocol(PROTOCOLS.includes(value.policy?.api) ? value.policy.api : PROTOCOLS[0])
         }).catch(() => { if (active) setFeedback(t('unavailable')) })
         return () => { active = false; requestGeneration.current += 1 }
-      }, [])
+      }, [viewMode])
       const complete = (operation, value) => {
         setState(value); setModels(value.models || []); setPending(null); setFeedback(t('saved'))
         if (operation.type === 'save-connection') { setDraft({}); setApiKey(''); setAuthType('keep') }
@@ -416,6 +420,7 @@ window.__ModuleLoader__.load({
         React.createElement('h3', { className: 'cpa-section-title' }, title),
         ...children,
       )
+      if (viewMode) return React.createElement('p', { className: 'cpa-note' }, t('intro'))
       return React.createElement('div', { className: 'cpa-page', 'aria-busy': busy || !state },
         React.createElement('style', { key: 'cpa-css' }, SETTINGS_CSS),
         React.createElement('section', { className: 'cpa-section' },
