@@ -76,9 +76,13 @@ export function createTransport(protocol, baseURL, diagnostics, fetchImpl = glob
       record({ stage: 'http', status: response.status, ...(/^[A-Za-z0-9._:-]{1,128}$/.test(requestId ?? '') ? { requestId } : {}) })
       if (!response.body || !response.headers.get('content-type')?.toLowerCase().includes('text/event-stream')) return response
       let pending = ''
-      let terminal = false
+      let sawTerminal = false
+      // A failure event is followed by its payload, so the body is left to the
+      // adapter that turns it into an error. A completion event is the last one.
+      let endsBody = false
+      let abortRecorded = false
       const signal = init.signal ?? (input instanceof Request ? input.signal : undefined)
-      const onAbort = () => { if (!terminal) { terminal = true; record({ stage: signal?.reason?.name === 'TimeoutError' ? 'timeout' : 'abort' }) } }
+      const onAbort = () => { if (!abortRecorded) { abortRecorded = true; record({ stage: signal?.reason?.name === 'TimeoutError' ? 'timeout' : 'abort' }) } }
       if (signal?.aborted) onAbort()
       else signal?.addEventListener('abort', onAbort, { once: true })
       const cleanup = () => signal?.removeEventListener('abort', onAbort)
@@ -89,13 +93,40 @@ export function createTransport(protocol, baseURL, diagnostics, fetchImpl = glob
         pending = lines.pop().slice(-1024)
         for (const line of lines) {
           const stage = terminalOf(line)
-          if (stage && !terminal) { terminal = true; cleanup(); record({ stage }) }
+          if (stage && !sawTerminal) { sawTerminal = true; cleanup(); record({ stage }); endsBody = stage !== 'sse-failed' }
         }
       }
-      const body = response.body.pipeThrough(new TransformStream({
-        transform(chunk, controller) { inspect(decoder.decode(chunk, { stream: true })); controller.enqueue(chunk) },
-        flush() { inspect(decoder.decode() + '\n'); cleanup(); if (!terminal) record({ stage: flushStage }) },
-      }))
+      // A CPA-compatible proxy is free to keep the socket open after the
+      // terminal event (keep-alive comments) instead of closing it. pi-ai reads
+      // the body until it ends, so an open socket would hold the turn until the
+      // idle watchdog fires. The transport therefore finishes the body itself
+      // once the terminal event arrives, exactly as a compliant server would.
+      const reader = response.body.getReader()
+      const body = new ReadableStream({
+        async pull(controller) {
+          try {
+            const { done, value } = await reader.read()
+            if (done) {
+              inspect(decoder.decode() + '\n')
+              cleanup()
+              if (!sawTerminal) record({ stage: flushStage })
+              controller.close()
+              return
+            }
+            inspect(decoder.decode(value, { stream: true }))
+            controller.enqueue(value)
+            if (endsBody) {
+              cleanup()
+              await reader.cancel().catch(() => {})
+              controller.close()
+            }
+          } catch (error) {
+            cleanup()
+            controller.error(error)
+          }
+        },
+        cancel(reason) { cleanup(); void reader.cancel(reason).catch(() => {}) },
+      })
       return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers })
     } catch (error) {
       record({ stage: error?.name === 'TimeoutError' ? 'timeout' : error?.name === 'AbortError' ? 'abort' : 'before-http' })

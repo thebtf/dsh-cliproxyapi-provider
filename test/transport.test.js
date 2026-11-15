@@ -1,3 +1,4 @@
+import http from 'node:http'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createTransport, resolveProtocol, terminalStage, usesScopedFetch } from '../src/transport.js'
@@ -58,5 +59,79 @@ test('the Google transport streams through the runtime fetch instead of failing'
     assert.match(requests[0].url, /\/v1beta\/models\/gemini-2\.5-pro:streamGenerateContent/)
   } finally {
     globalThis.fetch = realFetch
+  }
+})
+
+function sseServer(handler) {
+  return new Promise((resolve) => {
+    const server = http.createServer((req, res) => {
+      req.resume()
+      req.on('end', () => handler(res))
+    })
+    server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port }))
+  })
+}
+
+function anthropicModel(port) {
+  return {
+    id: 'm', name: 'm', provider: 'CLIProxyAPI', api: 'anthropic-messages',
+    baseUrl: 'http://127.0.0.1:' + port + '/v1', reasoning: false, input: ['text'],
+    contextWindow: 100000, maxTokens: 1000, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    compat: { supportsStrictMode: true },
+  }
+}
+
+function writeAnthropicTerminal(res) {
+  const send = (type, data) => res.write('event: ' + type + '\ndata: ' + JSON.stringify({ type, ...data }) + '\n\n')
+  send('message_start', { message: { id: 'msg_1', type: 'message', role: 'assistant', model: 'm', content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 5, output_tokens: 0 } } })
+  send('content_block_start', { index: 0, content_block: { type: 'text', text: '' } })
+  send('content_block_delta', { index: 0, delta: { type: 'text_delta', text: 'pong' } })
+  send('content_block_stop', { index: 0 })
+  send('message_delta', { delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: 1 } })
+  send('message_stop', {})
+}
+
+test('a proxy that keeps the SSE socket open after the terminal event still ends the stream', async () => {
+  let clientClosed = false
+  let keepAlive
+  const { server, port } = await sseServer((res) => {
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' })
+    writeAnthropicTerminal(res)
+    keepAlive = setInterval(() => { if (!clientClosed) { try { res.write(': keep-alive\n\n') } catch { } } }, 1000)
+    res.on('close', () => { clientClosed = true; clearInterval(keepAlive) })
+  })
+  try {
+    const diagnostics = []
+    const transport = createTransport('anthropic-messages', 'http://127.0.0.1:' + port + '/v1', diagnostics, globalThis.fetch, false)
+    const started = Date.now()
+    const seen = []
+    for await (const event of transport.streamSimple(anthropicModel(port), { messages: [{ role: 'user', content: 'hi' }] }, { apiKey: 'x' })) seen.push(event.type)
+    const elapsed = Date.now() - started
+    assert.ok(elapsed < 5000, 'the stream must end on the terminal event instead of waiting for the socket, took ' + elapsed + 'ms')
+    assert.equal(seen.at(-1), 'done')
+    assert.ok(seen.includes('text_delta'))
+    assert.deepEqual(diagnostics.map((entry) => entry.stage), ['payload', 'http', 'sse-completed'])
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    assert.equal(clientClosed, true, 'the transport must release the upstream socket')
+  } finally {
+    clearInterval(keepAlive)
+    await new Promise((resolve) => server.close(resolve))
+  }
+})
+
+test('a stream that ends without a terminal event is recorded as incomplete', async () => {
+  const { server, port } = await sseServer((res) => {
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
+    const send = (type, data) => res.write('event: ' + type + '\ndata: ' + JSON.stringify({ type, ...data }) + '\n\n')
+    send('message_start', { message: { id: 'msg_1', type: 'message', role: 'assistant', model: 'm', content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 5, output_tokens: 0 } } })
+    res.end()
+  })
+  try {
+    const diagnostics = []
+    const transport = createTransport('anthropic-messages', 'http://127.0.0.1:' + port + '/v1', diagnostics, globalThis.fetch, false)
+    for await (const event of transport.streamSimple(anthropicModel(port), { messages: [{ role: 'user', content: 'hi' }] }, { apiKey: 'x' })) { if (event.type === 'error') break }
+    assert.equal(diagnostics.at(-1).stage, 'sse-incomplete')
+  } finally {
+    await new Promise((resolve) => server.close(resolve))
   }
 })

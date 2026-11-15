@@ -34,12 +34,13 @@ async function harness(initial = state()) {
   const scope = { getSnapshot() { return { status: 'ready', writable: true } }, subscribe() { return () => { } } }
   plugin.apply({ configForms: { get(ns) { assert.equal(ns, 'llm-cliproxyapi'); return scope }, whileServed(names, fn) { assert.deepEqual(names, ['llm-cliproxyapi']); return fn() } }, pluginNavigation: { openList() { opened++ } }, locale: { register(ns, value) { dictionaries[ns] = value; return () => { } }, bind() { return (key) => key } }, slots: { inject(_name, fn) { return fn() }, register(options, component) { registrations[options.name] = { options, component }; return () => { } } }, effect(fn) { return fn() } })
   const item = registrations['plugins.item']
-  const render = (language) => { cursor = 0; return item.component({ t: (key) => language ? dictionaries['settings.cliProxyApi'][language][key] || key : key, useScope: () => ({ status: 'ready', writable: true }) }) }
+  let lastCursor = 0
+  const render = (language, extra = {}) => { cursor = 0; const tree = item.component({ t: (key) => language ? dictionaries['settings.cliProxyApi'][language][key] || key : key, useScope: () => ({ status: 'ready', writable: true }), ...extra }); lastCursor = cursor; return tree }
   render(); effects.splice(0).forEach((effect) => effect()); await new Promise((resolve) => setTimeout(resolve, 0))
   const button = (tree, label) => find(tree, (node) => node.type === 'button' && text(node) === label)[0]
   const input = (tree, type) => find(tree, (node) => node.type === 'input' && node.props.type === type)[0]
   const select = (tree, name) => find(tree, (node) => node.type === 'select' && node.props.name === name)[0]
-  return { calls, render, button, input, select, registrations, dictionaries, get opened() { return opened }, setReply(value) { reply = value }, setCurrent(value) { current = value } }
+  return { calls, render, renderSummary: (language) => render(language, { view: 'summary' }), hookCount: () => lastCursor, button, input, select, registrations, dictionaries, get opened() { return opened }, setReply(value) { reply = value }, setCurrent(value) { current = value } }
 }
 
 test('combined save includes CAS, credential action, policy and zero-model selection', async () => {
@@ -199,4 +200,16 @@ test('changing endpoint after returning to edit clears a replacement key', async
   assert.equal(h.input(tree, 'password').props.value, 'private-key')
   h.input(tree, 'url').props.onChange({ currentTarget: { value: 'https://different.example/v1' } }); tree = h.render()
   assert.equal(h.input(tree, 'password').props.value, '')
+})
+
+test('the summary view keeps the hook order so the host can switch views safely', async () => {
+  const h = await harness()
+  const page = h.render()
+  const pageHooks = h.hookCount()
+  const summary = h.renderSummary()
+  assert.ok(pageHooks > 0)
+  assert.equal(h.hookCount(), pageHooks)
+  assert.equal(text(summary), 'intro')
+  assert.equal(find(summary, (node) => node.type === 'form').length, 0)
+  assert.equal(find(page, (node) => node.type === 'form').length, 1)
 })
