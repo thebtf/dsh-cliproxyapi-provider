@@ -73,25 +73,40 @@ export function createTransport(protocol, baseURL, diagnostics, fetchImpl = glob
   const scopedFetch = async (input, init = {}) => {
     const url = input instanceof Request ? input.url : String(input)
     if (new URL(url).origin !== origin) throw new Error('CPA request origin changed')
+    // pi-ai cancels its own fetch the moment it stops consuming a stream: its
+    // adapter aborts the very signal it handed to the API. A middleware in
+    // front of the gateway (a compressing proxy, an accounting proxy) reads
+    // that cancellation as an abandoned turn and aborts its own upstream work,
+    // so a turn that finished normally is still recorded as a mid-stream
+    // disconnect. The wire request therefore keeps its own lifetime: a consumer
+    // that leaves after the terminal event is ignored and the tail is read to
+    // its end, while a consumer that leaves before it cancels the request for
+    // real.
+    const consumer = init.signal ?? (input instanceof Request ? input.signal : undefined)
+    const upstream = new AbortController()
+    let abortRecorded = false
+    let sawTerminal = false
+    const onAbort = () => {
+      if (!abortRecorded) { abortRecorded = true; record({ stage: consumer?.reason?.name === 'TimeoutError' ? 'timeout' : 'abort' }) }
+      // Once the stream reached its terminal event the remaining bytes are
+      // bookkeeping; letting the consumer stop must not tear the socket down.
+      if (!sawTerminal) upstream.abort(consumer?.reason)
+    }
+    if (consumer?.aborted) onAbort()
+    else consumer?.addEventListener('abort', onAbort, { once: true })
+    const cleanup = () => consumer?.removeEventListener('abort', onAbort)
     try {
       const headers = new Headers(input instanceof Request ? input.headers : undefined)
       if (init.headers) new Headers(init.headers).forEach((value, key) => headers.set(key, value))
       if (keyless) headers.delete('authorization')
-      const response = await fetchImpl(input, { ...init, headers, redirect: 'error' })
+      const response = await fetchImpl(input, { ...init, signal: upstream.signal, headers, redirect: 'error' })
       const requestId = response.headers.get('x-request-id')
       record({ stage: 'http', status: response.status, ...(/^[A-Za-z0-9._:-]{1,128}$/.test(requestId ?? '') ? { requestId } : {}) })
       if (!response.body || !response.headers.get('content-type')?.toLowerCase().includes('text/event-stream')) return response
       let pending = ''
-      let sawTerminal = false
       // A failure event is followed by its payload, so the body is left to the
       // adapter that turns it into an error. A completion event is the last one.
       let endsBody = false
-      let abortRecorded = false
-      const signal = init.signal ?? (input instanceof Request ? input.signal : undefined)
-      const onAbort = () => { if (!abortRecorded) { abortRecorded = true; record({ stage: signal?.reason?.name === 'TimeoutError' ? 'timeout' : 'abort' }) } }
-      if (signal?.aborted) onAbort()
-      else signal?.addEventListener('abort', onAbort, { once: true })
-      const cleanup = () => signal?.removeEventListener('abort', onAbort)
       const decoder = new TextDecoder()
       const inspect = (text) => {
         pending += text
@@ -108,12 +123,11 @@ export function createTransport(protocol, baseURL, diagnostics, fetchImpl = glob
       // idle watchdog fires. The transport therefore finishes the body itself
       // once the terminal event arrives, exactly as a compliant server would.
       const reader = response.body.getReader()
-      // A middleware in front of the gateway (a compressing proxy, an
-      // accounting proxy) treats a client that vanishes mid-response as a
-      // cancelled turn and aborts its own upstream work. The consumer stream
-      // still ends on the terminal event, but the tail is read to its end in
-      // the background first, with a cap so a proxy that never closes cannot
-      // hold the socket forever.
+      // A middleware in front of the gateway treats a client that vanishes
+      // mid-response as a cancelled turn and aborts its own upstream work. The
+      // consumer stream still ends on the terminal event, but the tail is read
+      // to its end in the background first, with a cap so a proxy that never
+      // closes cannot hold the socket forever.
       let draining = false
       const drain = () => {
         if (draining) return
@@ -147,11 +161,20 @@ export function createTransport(protocol, baseURL, diagnostics, fetchImpl = glob
             controller.error(error)
           }
         },
-        cancel(reason) { cleanup(); void reader.cancel(reason).catch(() => {}) },
+        cancel(reason) {
+          cleanup()
+          // The consumer walked away on its own. Before the terminal event that
+          // is a real cancellation of the wire request; after it the drain owns
+          // the tail and the socket must stay open.
+          if (sawTerminal) return
+          upstream.abort(reason)
+          void reader.cancel(reason).catch(() => {})
+        },
       })
       return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers })
     } catch (error) {
-      record({ stage: error?.name === 'TimeoutError' ? 'timeout' : error?.name === 'AbortError' ? 'abort' : 'before-http' })
+      cleanup()
+      if (!abortRecorded) record({ stage: error?.name === 'TimeoutError' ? 'timeout' : error?.name === 'AbortError' ? 'abort' : 'before-http' })
       throw error
     }
   }

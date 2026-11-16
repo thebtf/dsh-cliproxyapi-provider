@@ -152,6 +152,61 @@ test('the transport reads a completed response to its end so a middleware does n
     await new Promise((resolve) => server.close(resolve))
   }
 })
+// pi-ai stops consuming as soon as it has the terminal event and aborts the
+// signal it handed to the API. A middleware in front of the gateway reads that
+// abort as a cancelled turn, so the transport must keep the wire request alive
+// on its own until the tail is read.
+test('a consumer that stops after the terminal event does not hang up on a middleware', async () => {
+  let clientClosed = false
+  let trailerSent = false
+  const { server, port } = await sseServer((res) => {
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
+    writeAnthropicTerminal(res)
+    setTimeout(() => { if (!clientClosed) { trailerSent = true; try { res.write('event: usage\ndata: {"input_tokens":5}\n\n'); res.end() } catch { } } }, 150)
+    res.on('close', () => { clientClosed = true })
+  })
+  try {
+    const diagnostics = []
+    const transport = createTransport('anthropic-messages', 'http://127.0.0.1:' + port + '/v1', diagnostics, globalThis.fetch, false)
+    const caller = new AbortController()
+    const seen = []
+    for await (const event of transport.streamSimple(anthropicModel(port), { messages: [{ role: 'user', content: 'hi' }] }, { apiKey: 'x', signal: caller.signal })) seen.push(event.type)
+    assert.equal(seen.at(-1), 'done')
+    // Exactly what the pi-ai adapter does once its consumer is done.
+    caller.abort('pi-ai stream consumer stopped')
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    assert.equal(trailerSent, true, 'the transport must keep reading after the consumer aborted')
+    assert.equal(clientClosed, true, 'the server closed the response after its trailer')
+    assert.deepEqual(diagnostics.map((entry) => entry.stage), ['payload', 'http', 'sse-completed'])
+  } finally {
+    await new Promise((resolve) => server.close(resolve))
+  }
+})
+
+test('a consumer that stops before the terminal event cancels the wire request', async () => {
+  let clientClosed = false
+  const { server, port } = await sseServer((res) => {
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
+    const send = (type, data) => res.write('event: ' + type + '\ndata: ' + JSON.stringify({ type, ...data }) + '\n\n')
+    send('message_start', { message: { id: 'msg_1', type: 'message', role: 'assistant', model: 'm', content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 5, output_tokens: 0 } } })
+    res.on('close', () => { clientClosed = true })
+  })
+  try {
+    const diagnostics = []
+    const transport = createTransport('anthropic-messages', 'http://127.0.0.1:' + port + '/v1', diagnostics, globalThis.fetch, false)
+    const caller = new AbortController()
+    const stream = transport.streamSimple(anthropicModel(port), { messages: [{ role: 'user', content: 'hi' }] }, { apiKey: 'x', signal: caller.signal })
+    const iterator = stream[Symbol.asyncIterator]()
+    await iterator.next()
+    caller.abort('caller cancelled the turn')
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    assert.equal(clientClosed, true, 'an abandoned turn must release the upstream socket')
+    assert.ok(diagnostics.some((entry) => entry.stage === 'abort'), 'the cancellation must still be recorded')
+  } finally {
+    await new Promise((resolve) => server.close(resolve))
+  }
+})
+
 test('a stream that ends without a terminal event is recorded as incomplete', async () => {
   const { server, port } = await sseServer((res) => {
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
