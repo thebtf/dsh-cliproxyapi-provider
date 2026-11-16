@@ -190,6 +190,24 @@ test('structured diagnostics and catalog codes are localized without rendering u
   }
 })
 
+test('the request log stays behind a disclosure instead of flooding the page', async () => {
+  const h = await harness({
+    ...state(),
+    diagnostics: Array.from({ length: 18 }, (_, index) => ({ stage: ['payload', 'http', 'sse-completed'][index % 3], at: 1763000000000 + index * 1000, toolCount: 426 })),
+  })
+  const tree = h.render()
+  const disclosures = find(tree, (node) => node.type === 'details')
+  const log = disclosures.filter((node) => find(node, (child) => child.type === 'summary').some((child) => text(child).includes('diagnostics')))
+  assert.equal(log.length, 1, 'the request log must be collapsed')
+  const summary = find(log[0], (child) => child.type === 'summary')[0]
+  assert.match(text(summary), /18/, 'the summary must state how many entries are hidden')
+  // The page itself must not carry the entries outside the disclosure: the
+  // rendered tree without that subtree may not mention a single stage.
+  const withoutLog = (node) => Array.isArray(node) ? node.flatMap(withoutLog) : !node || typeof node !== 'object' ? node : node === log[0] ? null : { ...node, children: withoutLog(node.children) }
+  const page = text(withoutLog(tree))
+  for (const stage of ['HTTP response', 'Request payload', 'Stream completed']) assert.ok(!page.includes(stage), stage)
+})
+
 test('changing endpoint after returning to edit clears a replacement key', async () => {
   const h = await harness(); let tree = h.render()
   h.select(tree, 'authAction').props.onChange({ currentTarget: { value: 'replace' } }); tree = h.render()
