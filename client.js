@@ -156,7 +156,8 @@ window.__ModuleLoader__.load({
 .cpa-model + .cpa-model { border-top:.5px solid var(--dsw-alias-border-l2); }
 .cpa-model-head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; min-width:0; }
 .cpa-model-id { min-width:0; font-family:var(--dsh-font-family-code-default); font-size:12px; line-height:18px; color:var(--dsw-alias-label-tertiary); overflow-wrap:anywhere; }
-.cpa-trace { margin-top:2px; }
+.cpa-trace { margin-top:8px; }
+.cpa-trace-log { max-height:180px; overflow-y:auto; scrollbar-gutter:stable; }
 .cpa-model-meta { display:flex; flex-wrap:wrap; align-items:center; gap:6px; min-width:0; }
 .cpa-details { min-width:0; font-size:12px; line-height:1.6; }
 .cpa-details > summary { cursor:pointer; color:var(--dsw-alias-label-tertiary); }
@@ -436,12 +437,6 @@ window.__ModuleLoader__.load({
           state?.recoveryError ? note(t('recoveryWarn') + ': ' + state.recoveryError.message, 'warn') : null,
           state?.activationError ? React.createElement('p', { className: 'cpa-note', 'data-tone': 'error', role: 'alert' }, t('activationFailed'), ' ', state.activationError.code, state.activationError.message ? ' — ' + state.activationError.message : '') : null,
           state?.catalog?.error ? note(t(Object.hasOwn(catalogErrorKeys, state.catalog.error.code) ? catalogErrorKeys[state.catalog.error.code] : 'catalogError'), 'warn') : null,
-          diagnosticEntries.length
-            ? React.createElement('details', { className: 'cpa-details cpa-trace' },
-              React.createElement('summary', null, t('diagnostics'), ' · ', diagnosticEntries.length),
-              React.createElement('div', { className: 'cpa-details-body' }, diagnosticEntries),
-            )
-            : null,
           feedback ? note(feedback) : null,
           state ? React.createElement('details', { className: 'cpa-details cpa-trace' },
             React.createElement('summary', null, t('revision'), ': ', state.revision),
@@ -513,6 +508,12 @@ window.__ModuleLoader__.load({
             React.createElement('p', { className: 'cpa-note', role: 'note' }, t('forgetHelp')),
           ),
         ),
+        diagnosticEntries.length
+          ? React.createElement('details', { className: 'cpa-details cpa-trace' },
+            React.createElement('summary', null, t('diagnostics'), ' · ', diagnosticEntries.length),
+            React.createElement('div', { className: 'cpa-details-body cpa-trace-log' }, diagnosticEntries),
+          )
+          : null,
       )
     }
 
