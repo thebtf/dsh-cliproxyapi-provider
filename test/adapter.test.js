@@ -53,3 +53,18 @@ test('adapter publishes the base each protocol needs and keeps the stored one', 
   update(snapshot('https://one.invalid/v1', { api: 'openai-completions' }))
   assert.equal(published(adapter)[0].baseUrl, 'https://one.invalid/v1')
 })
+
+// pi-ai never pulses its idle watchdog, so the budget counts silence since the
+// last streamed event. A gateway that thinks before its first token, or a
+// middleware that only sends keep-alive comments, would hit a short budget
+// while the core path (which re-arms on every chunk) would not. The default
+// therefore matches the core's DEFAULT_STREAM_IDLE_TIMEOUT_MS.
+test('adapter keeps the core idle budget and still honours an explicit one', async () => {
+  const ctx = { credentials: {}, get: () => undefined }
+  const { adapter, update } = createGatewayAdapter(ctx, snapshot('https://one.invalid/v1'), [])
+  assert.equal(adapter.config.profiles().get('CLIProxyAPI').streamIdleTimeoutMs, 300000)
+  update(snapshot('https://one.invalid/v1', { streamIdleTimeoutMs: 45000 }))
+  assert.equal(adapter.config.profiles().get('CLIProxyAPI').streamIdleTimeoutMs, 45000)
+  update(snapshot('https://one.invalid/v1'))
+  assert.equal(adapter.config.profiles().get('CLIProxyAPI').streamIdleTimeoutMs, 300000)
+})

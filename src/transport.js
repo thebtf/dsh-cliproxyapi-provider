@@ -53,7 +53,13 @@ export function usesScopedFetch(api) {
   return resolveProtocol(api) !== 'google-generative-ai'
 }
 
-export function createTransport(protocol, baseURL, diagnostics, fetchImpl = globalThis.fetch, keyless = false) {
+// How long the transport keeps reading a completed stream after the consumer
+// already saw its end. Long enough for a middleware in front of the gateway to
+// finish its bookkeeping and close the response, short enough that a proxy
+// which never closes cannot pin the socket.
+export const TERMINAL_DRAIN_MS = 5000
+
+export function createTransport(protocol, baseURL, diagnostics, fetchImpl = globalThis.fetch, keyless = false, drainMs = TERMINAL_DRAIN_MS) {
   const api = resolveProtocol(protocol)
   const origin = new URL(baseURL).origin
   const native = FACTORIES[api]()
@@ -102,6 +108,22 @@ export function createTransport(protocol, baseURL, diagnostics, fetchImpl = glob
       // idle watchdog fires. The transport therefore finishes the body itself
       // once the terminal event arrives, exactly as a compliant server would.
       const reader = response.body.getReader()
+      // A middleware in front of the gateway (a compressing proxy, an
+      // accounting proxy) treats a client that vanishes mid-response as a
+      // cancelled turn and aborts its own upstream work. The consumer stream
+      // still ends on the terminal event, but the tail is read to its end in
+      // the background first, with a cap so a proxy that never closes cannot
+      // hold the socket forever.
+      let draining = false
+      const drain = () => {
+        if (draining) return
+        draining = true
+        const stop = setTimeout(() => { void reader.cancel().catch(() => {}) }, drainMs)
+        if (typeof stop.unref === 'function') stop.unref()
+        void (async () => {
+          try { while (!(await reader.read()).done) { /* discard the tail */ } } catch { /* socket already gone */ } finally { clearTimeout(stop) }
+        })()
+      }
       const body = new ReadableStream({
         async pull(controller) {
           try {
@@ -117,7 +139,7 @@ export function createTransport(protocol, baseURL, diagnostics, fetchImpl = glob
             controller.enqueue(value)
             if (endsBody) {
               cleanup()
-              await reader.cancel().catch(() => {})
+              drain()
               controller.close()
             }
           } catch (error) {
