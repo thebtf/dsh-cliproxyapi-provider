@@ -7,6 +7,16 @@ import { resolveIdentity } from './connection.js'
 import { protocolOf } from './policy.js'
 
 const PROVIDER = 'CLIProxyAPI'
+// pi-ai never pulses its idle watchdog: dsh-llm-pi-ai arms the timer only
+// around watchdog.next and re-arms it when a value is yielded, so this budget
+// measures silence since the last streamed event, not since the last byte on
+// the wire. A gateway that thinks for a while before the first token, or a
+// proxy in front of it that only sends keep-alive comments, therefore looks
+// idle. The core path re-arms on every chunk and heartbeat and runs with
+// DEFAULT_STREAM_IDLE_TIMEOUT_MS = 300_000 (dsh-llm-pi-ai src/config.ts:47,
+// not exported), so this default matches the core instead of being ten times
+// stricter; policy.streamIdleTimeoutMs still tightens it per connection.
+const STREAM_IDLE_TIMEOUT_MS = 300_000
 const LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
 
 export function createGatewayAdapter(ctx, snapshot, diagnostics, onMissing = () => { }) {
@@ -40,7 +50,7 @@ export function createGatewayAdapter(ctx, snapshot, diagnostics, onMissing = () 
       reasoning: captured.policy?.reasoning, thinkingBudgets: captured.policy?.thinkingBudgets,
       cacheRetention: captured.policy?.cacheRetention, transport: captured.policy?.transport,
       timeoutMs: captured.policy?.timeoutMs, websocketConnectTimeoutMs: captured.policy?.websocketConnectTimeoutMs,
-      streamIdleTimeoutMs: captured.policy?.streamIdleTimeoutMs ?? 30000,
+      streamIdleTimeoutMs: captured.policy?.streamIdleTimeoutMs ?? STREAM_IDLE_TIMEOUT_MS,
       maxRequestImageBytes: captured.policy?.maxRequestImageBytes ?? 20 * 1024 * 1024,
       maxRequestImages: captured.policy?.maxRequestImages ?? 50,
       imageOffloadCountQuantum: captured.policy?.imageOffloadCountQuantum ?? Math.min(10, captured.policy?.maxRequestImages ?? 50),

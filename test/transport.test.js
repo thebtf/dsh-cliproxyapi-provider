@@ -102,7 +102,9 @@ test('a proxy that keeps the SSE socket open after the terminal event still ends
   })
   try {
     const diagnostics = []
-    const transport = createTransport('anthropic-messages', 'http://127.0.0.1:' + port + '/v1', diagnostics, globalThis.fetch, false)
+    // The drain budget is capped short here so the test proves the cap instead
+    // of waiting out the production five seconds.
+    const transport = createTransport('anthropic-messages', 'http://127.0.0.1:' + port + '/v1', diagnostics, globalThis.fetch, false, 200)
     const started = Date.now()
     const seen = []
     for await (const event of transport.streamSimple(anthropicModel(port), { messages: [{ role: 'user', content: 'hi' }] }, { apiKey: 'x' })) seen.push(event.type)
@@ -111,14 +113,45 @@ test('a proxy that keeps the SSE socket open after the terminal event still ends
     assert.equal(seen.at(-1), 'done')
     assert.ok(seen.includes('text_delta'))
     assert.deepEqual(diagnostics.map((entry) => entry.stage), ['payload', 'http', 'sse-completed'])
-    await new Promise((resolve) => setTimeout(resolve, 150))
-    assert.equal(clientClosed, true, 'the transport must release the upstream socket')
+    // The consumer is done, but the upstream socket must stay open for a
+    // moment: a middleware in front of the gateway reads that as a completed
+    // response instead of a cancelled turn.
+    await new Promise((resolve) => setTimeout(resolve, 60))
+    assert.equal(clientClosed, false, 'the transport must not hang up the upstream the instant the consumer stops')
+    // A proxy that never closes cannot pin the socket either.
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    assert.equal(clientClosed, true, 'the drain cap must release an upstream that never closes')
   } finally {
     clearInterval(keepAlive)
     await new Promise((resolve) => server.close(resolve))
   }
 })
 
+test('the transport reads a completed response to its end so a middleware does not see an aborted turn', async () => {
+  let clientClosed = false
+  let trailerSent = false
+  const { server, port } = await sseServer((res) => {
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
+    writeAnthropicTerminal(res)
+    // A real middleware writes its usage trailer after the model finished and
+    // only then closes the response.
+    setTimeout(() => { if (!clientClosed) { trailerSent = true; try { res.write(': usage\n\n'); res.end() } catch { } } }, 150)
+    res.on('close', () => { clientClosed = true })
+  })
+  try {
+    const diagnostics = []
+    const transport = createTransport('anthropic-messages', 'http://127.0.0.1:' + port + '/v1', diagnostics, globalThis.fetch, false)
+    const seen = []
+    for await (const event of transport.streamSimple(anthropicModel(port), { messages: [{ role: 'user', content: 'hi' }] }, { apiKey: 'x' })) seen.push(event.type)
+    assert.equal(seen.at(-1), 'done')
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    assert.equal(trailerSent, true, 'the transport must still be reading when the trailer arrives')
+    assert.equal(clientClosed, true, 'the server closed the response after its trailer')
+    assert.deepEqual(diagnostics.map((entry) => entry.stage), ['payload', 'http', 'sse-completed'])
+  } finally {
+    await new Promise((resolve) => server.close(resolve))
+  }
+})
 test('a stream that ends without a terminal event is recorded as incomplete', async () => {
   const { server, port } = await sseServer((res) => {
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
