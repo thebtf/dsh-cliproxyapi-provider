@@ -18,6 +18,12 @@ const PROVIDER = 'CLIProxyAPI'
 // stricter; policy.streamIdleTimeoutMs still tightens it per connection.
 const STREAM_IDLE_TIMEOUT_MS = 300_000
 const LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
+// A content-compressing middleware in front of the gateway admits only a few
+// large decoded request bodies at a time and answers 503 until one finishes, so
+// a busy window can outlast the core's five attempts capped at ten seconds
+// (500, 1000, 2000, 4000, 8000 ms). The gateway path therefore retries longer
+// by default; policy.retryPolicy replaces this whole object.
+const DEFAULT_RETRY_POLICY = { mode: 'normal', maxRetries: 8, backoff: { initialDelayMs: 1000, maxDelayMs: 20000 } }
 
 export function createGatewayAdapter(ctx, snapshot, diagnostics, onMissing = () => { }) {
   let profiles = new Map()
@@ -36,7 +42,13 @@ export function createGatewayAdapter(ctx, snapshot, diagnostics, onMissing = () 
         baseUrl: protocolBase, reasoning: !!efforts, ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
         input: model.inputModalities ?? model.input ?? ['text'], contextWindow: model.contextWindow,
         maxTokens: model.maxTokens, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        compat: { ...captured.policy?.compat, ...model.compat, supportsStrictMode: true },
+        // CLIProxyAPI returns thinking blocks without a signature. pi-ai's
+        // default (allowEmptySignature: false) turns such a block into plain
+        // assistant text when the history is replayed, so the model reads its
+        // own plan in the text channel and keeps writing plans as text instead
+        // of reasoning. Replaying the empty signature keeps reasoning in the
+        // thinking channel; policy.compat and model.compat can still override.
+        compat: { allowEmptySignature: true, ...captured.policy?.compat, ...model.compat, supportsStrictMode: true },
       }
     })
     const piProvider = createProvider({
@@ -55,7 +67,7 @@ export function createGatewayAdapter(ctx, snapshot, diagnostics, onMissing = () 
       maxRequestImages: captured.policy?.maxRequestImages ?? 50,
       imageOffloadCountQuantum: captured.policy?.imageOffloadCountQuantum ?? Math.min(10, captured.policy?.maxRequestImages ?? 50),
       requestImagePixelBudget: captured.policy?.requestImagePixelBudget ?? 2048 * 2048, requestImageMaxBytes: captured.policy?.requestImageMaxBytes ?? 1024 * 1024,
-      retryPolicy: resolveRetryPolicy(captured.policy?.retryPolicy, 'CPA'),
+      retryPolicy: resolveRetryPolicy(captured.policy?.retryPolicy ?? DEFAULT_RETRY_POLICY, 'CPA'),
       modelErrors: new Map(), configuredMaxTokens: new Map(),
     }
     profiles = new Map([[PROVIDER, profile]])

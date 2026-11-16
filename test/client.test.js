@@ -206,6 +206,14 @@ test('the request log stays behind a disclosure instead of flooding the page', a
   const withoutLog = (node) => Array.isArray(node) ? node.flatMap(withoutLog) : !node || typeof node !== 'object' ? node : node === log[0] ? null : { ...node, children: withoutLog(node.children) }
   const page = text(withoutLog(tree))
   for (const stage of ['HTTP response', 'Request payload', 'Stream completed']) assert.ok(!page.includes(stage), stage)
+  // The feed is a debugging aid, so it must sit below the settings form: a
+  // reader should reach the fields first and only then the request log.
+  const order = []
+  const walk = (node) => { if (Array.isArray(node)) return node.forEach(walk); if (!node || typeof node !== 'object') return; order.push(node); walk(node.children) }
+  walk(tree)
+  assert.ok(order.indexOf(log[0]) > order.findIndex((node) => node.type === 'form'), 'the request log must follow the settings form')
+  const panel = find(log[0], (node) => String(node.props.className || '').includes('cpa-trace-log'))
+  assert.equal(panel.length, 1, 'the entries must live in their own scrollable panel')
 })
 
 test('changing endpoint after returning to edit clears a replacement key', async () => {
