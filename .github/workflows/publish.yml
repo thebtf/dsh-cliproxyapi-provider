@@ -98,4 +98,40 @@ jobs:
             exit 0
           fi
 
-          npm publish --access public --provenance
+          # The registry sometimes accepts a publish and only later publishes it:
+          # the first attempt reports success ("being processed"), the version is
+          # still invisible for hours, and a retry answers 409 "Cannot publish over
+          # previously staged version" even though nobody used staged publishing
+          # (npm/cli#9889). That 409 is a wait, not a failure - fail the job only on
+          # any other publish error, and let the verify step decide.
+          set +e
+          output="$(npm publish --access public --provenance 2>&1)"
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          if [ "$status" -ne 0 ]; then
+            if printf '%s' "$output" | grep -q 'previously staged version'; then
+              echo "::warning title=Accepted earlier, still propagating::$package@$version was already accepted by the registry and is waiting for propagation. Do NOT re-dispatch this run and do NOT publish another version number; npm/cli#9889."
+            else
+              echo "::error title=Publish failed::npm publish exited with $status"
+              exit "$status"
+            fi
+          fi
+
+      - name: Wait until the registry serves the release
+        if: github.event_name == 'release' || inputs.dry_run != true
+        run: |
+          package="$(node -p "require('./package.json').name")"
+          version="$(node -p "require('./package.json').version")"
+          # A normal publish shows up in well under a minute; the phantom-staged
+          # stall above can take hours, so poll for a while and then report the
+          # state instead of burning another version number.
+          for attempt in $(seq 1 40); do
+            if npm view "$package@$version" version >/dev/null 2>&1; then
+              echo "$package@$version is on the registry (attempt $attempt)."
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::warning title=Not on the registry yet::$package@$version is not visible after 10 minutes. npm/cli#9889 can hold a publish for hours; check again later before publishing anything else."
+          exit 1
