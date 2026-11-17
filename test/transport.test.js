@@ -1,7 +1,7 @@
 import http from 'node:http'
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createTransport, resolveProtocol, terminalStage, usesScopedFetch } from '../src/transport.js'
+import { createTransport, MIN_WIRE_MAX_TOKENS, raiseMaxTokens, resolveProtocol, terminalStage, usesScopedFetch } from '../src/transport.js'
 
 test('an unknown protocol falls back to Responses instead of throwing', () => {
   assert.equal(resolveProtocol('anthropic-messages'), 'anthropic-messages')
@@ -202,6 +202,70 @@ test('a consumer that stops before the terminal event cancels the wire request',
     await new Promise((resolve) => setTimeout(resolve, 400))
     assert.equal(clientClosed, true, 'an abandoned turn must release the upstream socket')
     assert.ok(diagnostics.some((entry) => entry.stage === 'abort'), 'the cancellation must still be recorded')
+  } finally {
+    await new Promise((resolve) => server.close(resolve))
+  }
+})
+
+test('a clamped output budget is raised per protocol before the payload leaves', () => {
+  const model = { maxTokens: 128000 }
+  const anthropic = { max_tokens: 1 }
+  assert.deepEqual(raiseMaxTokens('anthropic-messages', anthropic, model), [{ field: 'max_tokens', from: 1, to: MIN_WIRE_MAX_TOKENS }])
+  assert.equal(anthropic.max_tokens, MIN_WIRE_MAX_TOKENS)
+  const responses = { max_output_tokens: 1 }
+  raiseMaxTokens('openai-responses', responses, model)
+  assert.equal(responses.max_output_tokens, MIN_WIRE_MAX_TOKENS)
+  const completions = { max_completion_tokens: 1 }
+  raiseMaxTokens('openai-completions', completions, model)
+  assert.equal(completions.max_completion_tokens, MIN_WIRE_MAX_TOKENS)
+  const legacy = { max_tokens: 1 }
+  raiseMaxTokens('openai-completions', legacy, model)
+  assert.equal(legacy.max_tokens, MIN_WIRE_MAX_TOKENS)
+  const google = { generationConfig: { maxOutputTokens: 1 } }
+  raiseMaxTokens('google-generative-ai', google, model)
+  assert.equal(google.generationConfig.maxOutputTokens, MIN_WIRE_MAX_TOKENS)
+})
+
+test('a healthy output budget and a smaller model ceiling are left alone', () => {
+  const healthy = { max_tokens: 32000 }
+  assert.equal(raiseMaxTokens('anthropic-messages', healthy, { maxTokens: 128000 }), undefined)
+  assert.equal(healthy.max_tokens, 32000)
+  // A model that really allows less than the floor keeps its own ceiling: the
+  // floor never asks a server for more output than the model advertises.
+  const small = { max_tokens: 1 }
+  raiseMaxTokens('anthropic-messages', small, { maxTokens: 1000 })
+  assert.equal(small.max_tokens, 1000)
+  const unknown = { max_tokens: 1 }
+  raiseMaxTokens('anthropic-messages', unknown, {})
+  assert.equal(unknown.max_tokens, MIN_WIRE_MAX_TOKENS)
+})
+
+test('a transcript that pushes pi-ai clamp to 1 still leaves with a usable budget', async () => {
+  let received = ''
+  const { server, port } = await sseServer((res) => {
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
+    writeAnthropicTerminal(res)
+    res.end()
+  })
+  try {
+    const diagnostics = []
+    const transport = createTransport('anthropic-messages', 'http://127.0.0.1:' + port + '/v1', diagnostics, async (input, init) => {
+      received = String(init?.body ?? '')
+      return globalThis.fetch(input, init)
+    }, false)
+    // A tiny context window with a huge model ceiling is what a long replayed
+    // history looks like to pi-ai: clampMaxTokensToContext returns its floor of
+    // 1 because the symbol estimate dwarfs the window.
+    const model = { ...anthropicModel(port), contextWindow: 1000, maxTokens: 64000 }
+    for await (const event of transport.streamSimple(model, { messages: [{ role: 'user', content: 'hi' }] }, { apiKey: 'x' })) {
+      if (event.type === 'error') throw new Error(String(event.error?.errorMessage ?? event.error))
+    }
+    const body = JSON.parse(received)
+    assert.equal(body.max_tokens, MIN_WIRE_MAX_TOKENS)
+    const clamped = diagnostics.find((entry) => entry.stage === 'payload-clamped')
+    assert.ok(clamped, 'the repair must be visible in the diagnostics panel')
+    assert.equal(clamped.from, 1)
+    assert.equal(clamped.to, MIN_WIRE_MAX_TOKENS)
   } finally {
     await new Promise((resolve) => server.close(resolve))
   }

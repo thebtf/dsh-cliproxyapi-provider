@@ -173,16 +173,16 @@ test('structured diagnostics and catalog codes are localized without rendering u
       ...state(), catalog: { error: { code, message: '<raw-body>' } }, diagnostics: [
         { stage: 'http', status: 503, requestId: 'req-123', at: 0, message: '<server-body>', stack: '<stack>' },
         { stage: 'sse-incomplete' }, { stage: 'sse-failed' }, { stage: 'abort' }, { stage: 'payload', toolCount: 3 },
-        { stage: 'http', requestId: '<img src=x>', body: '<secret-body>' }, { stage: '<unknown>', message: '<unsafe>' }
+        { stage: 'payload-clamped', field: 'max_tokens', from: 1, to: 4096 }, { stage: 'http', requestId: '<img src=x>', body: '<secret-body>' }, { stage: '<unknown>', message: '<unsafe>' }
       ]
     })
     const tree = h.render(); const rendered = text(tree)
-    for (const expected of [key, 'diagnosticHttp', '503', 'diagnosticRequestId', 'req-123', 'diagnosticAt', 'diagnosticSseIncomplete', 'diagnosticSseFailed', 'diagnosticAbort', 'diagnosticToolCount']) assert.ok(rendered.includes(expected), expected)
+    for (const expected of [key, 'diagnosticHttp', '503', 'diagnosticRequestId', 'req-123', 'diagnosticAt', 'diagnosticSseIncomplete', 'diagnosticSseFailed', 'diagnosticAbort', 'diagnosticToolCount', 'diagnosticPayloadClamped', 'diagnosticFrom 1', 'diagnosticTo 4096']) assert.ok(rendered.includes(expected), expected)
     for (const forbidden of ['<raw-body>', '<server-body>', '<stack>', '<secret-body>', '<unsafe>']) assert.ok(!rendered.includes(forbidden), forbidden)
     assert.equal(find(tree, (n) => n.type === 'img' || n.props.dangerouslySetInnerHTML).length, 0)
     for (const lang of ['en', 'ru', 'zh']) {
       const dictionary = h.dictionaries['settings.cliProxyApi'][lang]
-      for (const name of [...Object.values(codes), 'retryOperation', 'returnToEdit', 'conflictPending', 'diagnosticHttp', 'diagnosticSseIncomplete', 'diagnosticAbort', 'diagnosticStatus', 'diagnosticRequestId', 'diagnosticAt', 'diagnosticToolCount']) assert.ok(dictionary[name], `${lang}:${name}`)
+      for (const name of [...Object.values(codes), 'retryOperation', 'returnToEdit', 'conflictPending', 'diagnosticHttp', 'diagnosticSseIncomplete', 'diagnosticAbort', 'diagnosticStatus', 'diagnosticRequestId', 'diagnosticAt', 'diagnosticToolCount', 'diagnosticPayloadClamped', 'diagnosticFrom', 'diagnosticTo']) assert.ok(dictionary[name], `${lang}:${name}`)
       const translated = text(h.render(lang))
       for (const name of [key, 'diagnosticHttp', 'diagnosticSseIncomplete', 'diagnosticAbort', 'diagnosticRequestId']) assert.ok(translated.includes(dictionary[name]), `${lang}:${name}`)
       assert.ok(translated.includes('req-123')); assert.ok(!translated.includes('<server-body>'))

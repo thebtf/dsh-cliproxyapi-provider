@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import semver from 'semver'
 
 const manifest = JSON.parse(
   readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'),
@@ -28,6 +29,12 @@ test('manifest declares an engines.dsh range so core updates do not disable the 
   assert.equal(manifest.engines.dsh.includes('workspace:'), false)
 })
 
+// The plugin is built against this core line. app-boot compares versions with
+// semver includePrerelease, so the range below is what decides whether an
+// installed core keeps the plugin enabled.
+const CORE_LINE = '0.2.2'
+const SUPPORTED = '>=' + CORE_LINE + '-rc.3 <1.0.0'
+
 test('every DSH package accepts newer builds on the supported core line', () => {
   const pinned = [
     ...Object.entries(manifest.peerDependencies ?? {}),
@@ -38,9 +45,25 @@ test('every DSH package accepts newer builds on the supported core line', () => 
   // Exact pins turned a core prerelease bump into a disabled plugin: the
   // profile then held a version skew that app-boot refused. A caret range on
   // the same core line lets the host satisfy the requirement with whatever
-  // build of 0.2.2 it ships, without a new plugin release.
+  // build of the supported line it ships, without a new plugin release.
   for (const [name, range] of pinned) {
-    assert.equal(range, '^0.2.2-rc.2', name + ' must accept newer 0.2.2 builds')
+    assert.equal(range, '^' + CORE_LINE + '-rc.3', name + ' must accept newer ' + CORE_LINE + ' builds')
+    assert.equal(semver.subset(range, SUPPORTED), true, name + ' must stay inside the supported core line')
   }
-  assert.equal(manifest.engines.dsh, '^0.2.2-rc.2')
+})
+
+test('engines.dsh keeps the plugin enabled across minor core updates', () => {
+  // A caret range on a prerelease stops at the next minor version, so a bump of
+  // the core from 0.2.x to 0.3.x disabled a plugin whose requirements were
+  // still satisfied. The declared range therefore spans the whole 0.x line: the
+  // only release that may require a new plugin build is a 1.0 one, where a
+  // breaking change is actually allowed.
+  assert.equal(manifest.engines.dsh, SUPPORTED)
+  assert.equal(semver.subset(manifest.engines.dsh, SUPPORTED), true)
+  for (const version of ['0.2.2-rc.3', '0.2.2', '0.2.3', '0.3.0', '0.9.9']) {
+    assert.equal(semver.satisfies(version, manifest.engines.dsh, { includePrerelease: true }), true, version + ' must keep the plugin enabled')
+  }
+  for (const version of ['0.2.2-rc.2', '1.0.0']) {
+    assert.equal(semver.satisfies(version, manifest.engines.dsh, { includePrerelease: true }), false, version + ' must not claim support')
+  }
 })

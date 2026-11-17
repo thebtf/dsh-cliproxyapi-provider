@@ -23,7 +23,14 @@ const LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
 // a busy window can outlast the core's five attempts capped at ten seconds
 // (500, 1000, 2000, 4000, 8000 ms). The gateway path therefore retries longer
 // by default; policy.retryPolicy replaces this whole object.
-const DEFAULT_RETRY_POLICY = { mode: 'normal', maxRetries: 8, backoff: { initialDelayMs: 1000, maxDelayMs: 20000 } }
+//
+// PI_AI_ERROR is added to the core's retryable set: pi-ai classifies anything
+// that is neither a status, a network failure nor a stream cutoff as
+// PI_AI_ERROR (dsh-llm-pi-ai src/stream.ts classifyPiAiError), and a gateway
+// answers 502/503 with a plain body often enough that the code is reachable
+// without a retry choice of its own in dsh-llm. The retry schema accepts any
+// non-empty code string, so this needs no core change.
+const DEFAULT_RETRY_POLICY = { mode: 'normal', maxRetries: 8, retryableCodes: ['EMPTY_RESPONSE', 'RATE_LIMIT', 'SERVER', 'TIMEOUT', 'TRANSPORT', 'PI_AI_ERROR'], backoff: { initialDelayMs: 1000, maxDelayMs: 20000 } }
 
 export function createGatewayAdapter(ctx, snapshot, diagnostics, onMissing = () => { }) {
   let profiles = new Map()

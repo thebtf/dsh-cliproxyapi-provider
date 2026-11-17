@@ -113,7 +113,7 @@ entry under `plugins[0].versions`:
   "version": "0.4.4",
   "publishTimestamp": 1763081476,
   "source": { "type": "npm" },
-  "engines": { "dsh": "^0.2.2-rc.2" }
+  "engines": { "dsh": ">=0.2.2-rc.3 <1.0.0" }
 }
 ```
 
