@@ -56,8 +56,8 @@ test('engines.dsh keeps the plugin enabled across minor core updates', () => {
   // A caret range on a prerelease stops at the next minor version, so a bump of
   // the core from 0.2.x to 0.3.x disabled a plugin whose requirements were
   // still satisfied. The declared range therefore spans the whole 0.x line: the
-  // only release that may require a new plugin build is a 1.0 one, where a
-  // breaking change is actually allowed.
+  // range is a permissive version gate, not evidence that future 0.x APIs
+  // cannot break. Real compatibility still requires testing each core line.
   assert.equal(manifest.engines.dsh, SUPPORTED)
   assert.equal(semver.subset(manifest.engines.dsh, SUPPORTED), true)
   for (const version of ['0.2.2-rc.3', '0.2.2', '0.2.3', '0.3.0', '0.9.9']) {

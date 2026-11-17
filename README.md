@@ -12,14 +12,14 @@
 https://raw.githubusercontent.com/thebtf/dsh-cliproxyapi-provider/main/market/index.json
 ```
 
-需要 Node.js 24.9.0 或更新版本和 DeepSeek Harness 0.2.2-rc.3（`engines.dsh` = `>=0.2.2-rc.3 <1.0.0`，核心 0.x 的任意次小版本更新都不会停用插件）。插件已发布到 npm，安装与升级就是普通安装：
+需要 Node.js 24.9.0 或更新版本。基于 DeepSeek Harness 0.2.2-rc.3 构建；`engines.dsh` 允许 `>=0.2.2-rc.3 <1.0.0` 以避免不必要的版本限制，但未来核心 API 的兼容性仍需测试。通过 npm 安装与更新：
 
 ```powershell
-npx @deepseek-ai/dsh plugin --profile web add '@thebtf/dsh-cliproxyapi-provider@0.5.0'
+npx @deepseek-ai/dsh plugin --profile web add '@thebtf/dsh-cliproxyapi-provider@0.5.1'
 npx @deepseek-ai/dsh web
 ```
 
-下面的市场索引指向同一批 npm 版本；按 GitHub 标签安装仍然可用：`github:thebtf/dsh-cliproxyapi-provider#v0.5.0`。
+市场索引指向 npm 版本。历史 Git 引用仍保留，但新安装应使用 npm；现有安装切换来源需要执行下文的显式迁移流程。
 
 安装或升级后重启 Web 或 Desktop。在侧边栏 **插件** 页面选择 **CLIProxyAPI**，先选择网关提供的通信协议，再填写服务器地址；不会自动假定本地地址。末尾的 `/v1` 可写可不写：插件统一从 `{root}/v1/models` 读取模型目录，并按各协议自动补上各自 SDK 需要的路径（无、`/v1` 或 `/v1beta`）。明确选择保留身份、替换密钥、使用凭据引用或不使用验证。HTTP 不加密，密钥和请求可能泄露；对新地址重用已有身份需要明确同意。
 
@@ -35,8 +35,16 @@ npx @deepseek-ai/dsh web
 
 旧的通用 CLIProxyAPI 配置在插件接管前拥有原有路由。保存第一个连接时会自动接管该配置：插件记录完整备份、移除旧条目，并在首次目录刷新成功后完成切换。也可在 CPA 页面显式选择 **导入旧连接**。所有权不明确、缺少地址或字段无法迁移时会给出提示，不会静默覆盖。切换时可能短暂中断。不要用旧备份覆盖较新设置；只有迁移恢复／回退的所有权与版本检查允许时才能回退，否则应向前修复。升级前保留备份，更换版本后重启。
 
+### 将 Git 或本地文件安装切换到 npm
+
+这是包来源迁移，与导入旧模型连接不同。切换前停止活动请求，备份配置档、凭据存储与插件的连接备份，并妥善保护备份。记录原安装来源与提供方/模型 ID。
+
+对于包名已是 `@thebtf/dsh-cliproxyapi-provider` 的安装，在同一配置档中使用上面的 npm 安装命令，指定已验证的版本。不要先卸载或删除配置。重启 DSH 后检查仅有一份活动插件，核对来源、版本、地址、身份验证与模型选择，再测试已有会话。回退包版本不等于回退配置迁移，不要盲目覆盖较新的数据。
+
+旧包名需要单独验证迁移，不能直接安装第二个提供方并假设所有权会转移。隔离的 Desktop CLI/pnpm 测试已验证：同名 file 与固定提交的本地 Git 依赖可在不先卸载的情况下替换为 npm，哨兵设置、配置补丁与配置档内容保持不变。该测试使用普通包，不是完整的 CLIProxyAPI bundle 迁移；激活、凭据、已有会话、远程 Git 与旧包名仍需单独验证。插件不会自动切换来源。
+
 ## Models 集成范围
 
 Models 页底部显示 CPA 状态和 **打开插件**。点击后再选择 **CLIProxyAPI** 进入设置。这不是 Models 主列表中的完整自主管理行；其中原生编辑／删除操作不是 CPA 生命周期操作。
 
-`latest` 通道需要支持 GitHub 的更新器。市场索引为每个版本固定了一个确切提交，因此通过索引安装后市场有了可比较、可更新的稳定来源。npm 发布已接入 GitHub Releases（见 `.github/workflows/publish.yml`）；原生 Versions 只更新 registry 安装；npm 发布使用 npm trusted publishing（OIDC）认证，仓库中不保存任何令牌，首次配置见 [RELEASING.md](RELEASING.md)。卸载命令：`npx @deepseek-ai/dsh plugin --profile web remove @thebtf/dsh-cliproxyapi-provider`，然后重启；卸载不承诺删除已保存配置。
+npm 是常规安装与更新来源。GitHub Releases 用于发布说明与手动恢复包，不提供独立更新器。Discover 索引仅展示已验证的 npm 版本。恢复包必须与 npm 包字节一致；依赖仍需可用。发布与恢复流程见 [RELEASING.md](RELEASING.md)。卸载命令：`npx @deepseek-ai/dsh plugin --profile web remove @thebtf/dsh-cliproxyapi-provider`，然后重启；卸载不承诺删除已保存配置。

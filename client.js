@@ -433,6 +433,7 @@ window.__ModuleLoader__.load({
           React.createElement('div', { className: 'cpa-status' },
             React.createElement(StateDot, { state: state ? statusDots[state.status] || 'error' : 'ongoing' }),
             React.createElement('p', { className: 'cpa-status-text', role: 'status' }, state ? t(statusKeys[state.status] || 'statusError') : t('loading')),
+            typeof state?.pluginVersion === 'string' && state.pluginVersion ? React.createElement(Tag, { tone: 'neutral' }, 'v' + state.pluginVersion) : null,
           ),
           snapshot?.status === 'ready' && !snapshot.writable ? note(t('readOnly')) : null,
           state?.recoveryError ? note(t('recoveryWarn') + ': ' + state.recoveryError.message, 'warn') : null,
