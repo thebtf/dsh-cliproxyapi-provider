@@ -59,6 +59,45 @@ export function usesScopedFetch(api) {
 // which never closes cannot pin the socket.
 export const TERMINAL_DRAIN_MS = 5000
 
+// pi-ai fits maxTokens into the context window with a symbol-based estimate of
+// the whole transcript (utils/estimate.ts, CHARS_PER_TOKEN = 3.5). A replayed
+// history carries no usage, so that estimate is the only input, and on a long
+// transcript it overshoots the window by an order of magnitude, so
+// clampMaxTokensToContext (api/simple-options.ts) returns its floor of 1. A
+// wire budget of 1 is worse than useless: the compressing middleware in front
+// of the gateway sees a client that shrank its own output and restores it to
+// 128000-256000, and the model then writes for half an hour until max-tokens.
+// The turn should fail on the input side and let the host compact instead, so
+// no request leaves with a budget below this floor (capped by the model's own
+// ceiling, which keeps a model that truly allows less than the floor honest).
+export const MIN_WIRE_MAX_TOKENS = 4096
+const MAX_TOKEN_FIELDS = {
+  'anthropic-messages': ['max_tokens'],
+  'openai-responses': ['max_output_tokens'],
+  // openai-completions writes whichever of the two its compat.maxTokensField
+  // selects; both are inspected and only a field that is present is raised.
+  'openai-completions': ['max_completion_tokens', 'max_tokens'],
+  'google-generative-ai': [],
+}
+
+export function raiseMaxTokens(api, payload, model) {
+  const ceiling = typeof model?.maxTokens === 'number' && model.maxTokens > 0 ? model.maxTokens : MIN_WIRE_MAX_TOKENS
+  const target = Math.min(MIN_WIRE_MAX_TOKENS, ceiling)
+  const raised = []
+  for (const field of MAX_TOKEN_FIELDS[api] ?? []) {
+    const value = payload[field]
+    if (typeof value !== 'number' || value >= target) continue
+    payload[field] = target
+    raised.push({ field, from: value, to: target })
+  }
+  const config = payload.generationConfig
+  if (api === 'google-generative-ai' && config && typeof config === 'object' && typeof config.maxOutputTokens === 'number' && config.maxOutputTokens < target) {
+    raised.push({ field: 'generationConfig.maxOutputTokens', from: config.maxOutputTokens, to: target })
+    payload.generationConfig = { ...config, maxOutputTokens: target }
+  }
+  return raised.length > 0 ? raised : undefined
+}
+
 export function createTransport(protocol, baseURL, diagnostics, fetchImpl = globalThis.fetch, keyless = false, drainMs = TERMINAL_DRAIN_MS) {
   const api = resolveProtocol(protocol)
   const origin = new URL(baseURL).origin
@@ -190,7 +229,12 @@ export function createTransport(protocol, baseURL, diagnostics, fetchImpl = glob
       const applyPolicy = (value) => {
         const updated = { ...value }
         if (Array.isArray(value.tools)) updated.tools = value.tools.map((tool) => tool.type === 'function' ? { ...tool, strict: false } : tool)
-        record({ stage: 'payload', toolCount: Array.isArray(value.tools) ? value.tools.length : 0 })
+        const toolCount = Array.isArray(value.tools) ? value.tools.length : 0
+        record({ stage: 'payload', toolCount })
+        // Only a request that actually left with a broken budget is recorded,
+        // so a healthy turn keeps the panel timeline it always had.
+        const raised = raiseMaxTokens(api, updated, model)
+        if (raised) record({ stage: 'payload-clamped', toolCount, field: raised.map((entry) => entry.field).join(','), from: raised[0].from, to: raised[0].to })
         return updated
       }
       const original = options?.onPayload?.(payload, model)

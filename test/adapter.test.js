@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
 import { createGatewayAdapter } from '../src/adapter.js'
 
 const model = { id: 'model', name: 'Model', contextWindow: 10000, maxTokens: 500, inputModalities: ['text', 'image'], reasoningEfforts: { low: 'low', high: 'high' } }
@@ -97,6 +98,18 @@ test('adapter retries past a busy gateway window by default', async () => {
   assert.equal(policy.initialDelayMs, 1000)
   assert.equal(policy.maxDelayMs, 20000)
   assert.ok(policy.retryableCodes.includes('SERVER'))
+  // pi-ai reports anything that is neither a status nor a transport failure as
+  // PI_AI_ERROR, and a gateway answers 502/503 with a plain body often enough
+  // that the code is reachable. The core gives it no retry choice of its own, so
+  // the gateway path opts in here; the schema accepts any non-empty code, which
+  // the real core resolver proves below.
+  assert.ok(policy.retryableCodes.includes('PI_AI_ERROR'))
+  // providerRetryPolicy publishes the flattened view the adapter hands to the
+  // core; resolveRetryPolicy takes the nested shape, so the same codes are
+  // proved accepted through the real core resolver.
+  const core = resolveRetryPolicy({ mode: policy.mode, maxRetries: policy.maxRetries, retryableCodes: policy.retryableCodes, backoff: { initialDelayMs: policy.initialDelayMs, maxDelayMs: policy.maxDelayMs } }, 'CPA')
+  assert.equal(core.mode, 'normal')
+  assert.ok(core.retryableCodes.includes('PI_AI_ERROR'), 'the core must accept the extra code')
   update(snapshot('https://one.invalid/v1', { retryPolicy: { mode: 'normal', maxRetries: 1 } }))
   assert.equal(adapter.providerRetryPolicy('CLIProxyAPI').maxRetries, 1)
 })
