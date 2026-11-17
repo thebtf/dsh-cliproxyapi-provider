@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context, Service } from '@deepseek-ai/cordis'
@@ -110,6 +110,10 @@ test('own CPA connection can publish a native route without a generic provider p
     const plugin = ctx.plugin({ name, inject, Config, apply }, { refreshIntervalMs: 0 })
     fibers.push(plugin)
     await plugin.await()
+
+    const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
+    const stateResponse = await routes.get('/api/cliproxyapi/state').fetch(new Request('http://host/api/cliproxyapi/state'))
+    assert.equal((await stateResponse.json()).value.pluginVersion, manifest.version, 'state exposes the installed package version before configuration')
 
     const command = routes.get('/api/cliproxyapi/command')
     assert.ok(command, 'CPA must expose the authenticated command route for its own connection')

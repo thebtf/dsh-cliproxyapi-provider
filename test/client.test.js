@@ -43,6 +43,21 @@ async function harness(initial = state()) {
   return { calls, render, renderSummary: (language) => render(language, { view: 'summary' }), hookCount: () => lastCursor, button, input, select, registrations, dictionaries, get opened() { return opened }, setReply(value) { reply = value }, setCurrent(value) { current = value } }
 }
 
+test('settings header area shows the installed plugin version from gateway state', async () => {
+  for (const pluginVersion of ['1.2.3', '2.0.0-rc.4']) {
+    const h = await harness({ ...state(), pluginVersion })
+    const tree = h.render()
+    const header = find(tree, (node) => node.type === 'section')[0]
+    assert.ok(find(header, (node) => node.type === 'tag').some((node) => text(node) === `v${pluginVersion}`))
+  }
+})
+
+test('settings omit the version badge when an older gateway supplies no version', async () => {
+  const h = await harness()
+  const header = find(h.render(), (node) => node.type === 'section')[0]
+  assert.equal(find(header, (node) => node.type === 'tag').length, 0)
+})
+
 test('combined save includes CAS, credential action, policy and zero-model selection', async () => {
   const h = await harness(); let tree = h.render()
   h.button(tree, 'deselectAll').props.onClick(); tree = h.render()

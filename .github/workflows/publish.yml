@@ -1,137 +1,134 @@
 name: publish
-
-# Publishes the plugin to npm whenever a GitHub Release is published.
-#
-# Authentication uses npm trusted publishing (OIDC): GitHub mints a
-# short-lived credential for this exact workflow, so the repository stores
-# no npm token at all. Provenance attestations are generated automatically.
-#
-# One-time npm setup (see RELEASING.md):
-#   1. the package must exist on npm already - npm cannot attach a trusted
-#      publisher to a name that nobody has published;
-#   2. add a GitHub Actions trusted publisher for this repository with the
-#      workflow filename `publish.yml` and the "npm publish" action allowed.
-
 on:
   release:
     types: [published]
   workflow_dispatch:
     inputs:
       dry_run:
-        description: Pack and verify the release without publishing it
+        description: Test one tarball without publishing or changing release/catalog
         type: boolean
-        default: false
-
+        default: true
 permissions:
   contents: read
-  id-token: write
-
 concurrency:
   group: npm-publish
   cancel-in-progress: false
-
 jobs:
-  npm:
+  publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      tarball: ${{ steps.pack.outputs.tarball }}
+      version: ${{ steps.pack.outputs.version }}
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-
+        with:
+          persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
-
-      - name: Use an npm CLI that speaks trusted publishing
-        run: |
-          npm install --global npm@^11.15.0
-          npm --version
-
-      - name: Drop the placeholder token line so the OIDC exchange can run
-        # setup-node writes "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}"
-        # into .npmrc. With no token secret configured that expands to an empty
-        # value, npm then believes the registry is already authenticated and
-        # skips the OIDC exchange, failing with ENEEDAUTH or a 404.
-        run: |
-          npmrc="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
-          if [ -f "$npmrc" ]; then
-            sed -i '/_authToken/d' "$npmrc"
-          fi
-
-      - run: npm ci || npm install
-
+      # No setup-node registry-url: no placeholder token suppressing OIDC.
+      - run: npm install --global npm@11.15.0
+      - run: npm ci
       - run: npm run check
-
-      - name: Verify the release tag matches the manifest
-        if: github.event_name == 'release'
+      - run: node --test
+      - name: Require the matching immutable tag for real publication
+        if: env.DRY_RUN != 'true'
+        shell: bash
         run: |
-          tag="${{ github.event.release.tag_name }}"
           version="$(node -p "require('./package.json').version")"
-          if [ "$tag" != "v$version" ]; then
-            echo "release tag $tag does not match package.json version $version" >&2
-            exit 1
-          fi
-
-      - name: Publish
+          test "$RELEASE_TAG" = "v$version"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          gh release view "$RELEASE_TAG" --json tagName
+      - name: Pack once and install-test that exact tarball
+        id: pack
+        run: node scripts/prepare-release.mjs package.json "$RUNNER_TEMP/release"
+      - name: Publish tested tarball and verify registry bytes
         env:
-          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+        shell: bash
         run: |
-          package="$(node -p "require('./package.json').name")"
-          version="$(node -p "require('./package.json').version")"
-          echo "package: $package@$version"
-
-          if [ "$DRY_RUN" = "true" ]; then
-            echo "dry run: packing without publishing"
-            npm publish --access public --dry-run
-            exit 0
-          fi
-
-          # npm has no pending-publisher flow: a trusted publisher can only be
-          # attached to a package that already exists on the registry, so the
-          # very first version has to be published once by a maintainer.
-          if ! npm view "$package" name >/dev/null 2>&1; then
-            echo "::error title=First publish must be manual::$package is not on npm yet. Publish it once by hand, then add the trusted publisher; every later release goes through this workflow."
-            exit 1
-          fi
-
-          if npm view "$package@$version" version >/dev/null 2>&1; then
-            echo "$package@$version is already published; nothing to do"
-            exit 0
-          fi
-
-          # The registry sometimes accepts a publish and only later publishes it:
-          # the first attempt reports success ("being processed"), the version is
-          # still invisible for hours, and a retry answers 409 "Cannot publish over
-          # previously staged version" even though nobody used staged publishing
-          # (npm/cli#9889). That 409 is a wait, not a failure - fail the job only on
-          # any other publish error, and let the verify step decide.
-          set +e
-          output="$(npm publish --access public --provenance 2>&1)"
-          status=$?
-          set -e
-          printf '%s\n' "$output"
-          if [ "$status" -ne 0 ]; then
-            if printf '%s' "$output" | grep -q 'previously staged version'; then
-              echo "::warning title=Accepted earlier, still propagating::$package@$version was already accepted by the registry and is waiting for propagation. Do NOT re-dispatch this run and do NOT publish another version number; npm/cli#9889."
-            else
-              echo "::error title=Publish failed::npm publish exited with $status"
-              exit "$status"
-            fi
-          fi
-
-      - name: Wait until the registry serves the release
-        if: github.event_name == 'release' || inputs.dry_run != true
+          args=()
+          if [ "$DRY_RUN" = true ]; then args+=(--dry-run); fi
+          node scripts/publish-release.mjs "$RUNNER_TEMP/release/manifest.json" "$RUNNER_TEMP/release/$TARBALL" "$RELEASE_TAG" "${args[@]}"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.pack.outcome == 'success'
+        with:
+          name: tested-release
+          path: ${{ runner.temp }}/release/
+          if-no-files-found: error
+          retention-days: 30
+  recovery:
+    needs: publish
+    if: github.event_name != 'workflow_dispatch' || !inputs.dry_run
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
+      TARBALL: ${{ needs.publish.outputs.tarball }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: tested-release
+          path: ${{ runner.temp }}/release
+      - name: Reverify registry and attach identical recovery files without replacement
+        run: node scripts/recovery-assets.mjs "$RUNNER_TEMP/release/manifest.json" "$RUNNER_TEMP/release/$TARBALL" "$RELEASE_TAG" "$GITHUB_REPOSITORY"
+  catalog:
+    needs: recovery
+    if: github.event_name != 'workflow_dispatch' || !inputs.dry_run
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+          path: catalog
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          path: release-tools
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+        working-directory: release-tools
+      - uses: actions/download-artifact@v4
+        with:
+          name: tested-release
+          path: ${{ runner.temp }}/release
+      - name: Verify again and validate the entire current catalog with pinned DSH parser
+        id: catalog-version
+        shell: bash
         run: |
-          package="$(node -p "require('./package.json').name")"
-          version="$(node -p "require('./package.json').version")"
-          # A normal publish shows up in well under a minute; the phantom-staged
-          # stall above can take hours, so poll for a while and then report the
-          # state instead of burning another version number.
-          for attempt in $(seq 1 40); do
-            if npm view "$package@$version" version >/dev/null 2>&1; then
-              echo "$package@$version is on the registry (attempt $attempt)."
-              exit 0
-            fi
-            sleep 15
-          done
-          echo "::warning title=Not on the registry yet::$package@$version is not visible after 10 minutes. npm/cli#9889 can hold a publish for hours; check again later before publishing anything else."
-          exit 1
+          echo "version=$(node -p "require(process.env.RUNNER_TEMP + '/release/manifest.json').version")" >> "$GITHUB_OUTPUT"
+          mapfile -t tarballs < <(find "$RUNNER_TEMP/release" -maxdepth 1 -name '*.tgz' -type f)
+          test "${#tarballs[@]}" = 1
+          node release-tools/scripts/update-market.mjs catalog/market/index.json "$RUNNER_TEMP/release/manifest.json" "${tarballs[0]}" https://registry.npmjs.org
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          path: catalog
+          base: main
+          branch: automation/npm-catalog-${{ steps.catalog-version.outputs.version }}
+          add-paths: market/index.json
+          commit-message: 'chore: advertise verified npm release'
+          title: 'chore: advertise verified npm release'
+          body: Registry integrity and exact bytes plus recovery assets verified. Full catalog validated by the pinned real DSH parser. Review and merge normally.

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import packageManifest from '../package.json' with { type: 'json' }
 import { ConnectionError, resolveIdentity, saveConnection, validateEndpoint } from './connection.js'
 import { readCatalogCache, writeCatalogCache } from './catalog-store.js'
 import { legacyView, prepareLegacy, cutoverLegacy, finishLegacy, rollbackLegacy, discardPrepared } from './migration.js'
@@ -155,6 +156,7 @@ export function installGateway(ctx, config, discover, readJson, previewKey) {
     const saved = await durability()
     const status = !configured ? 'not-configured' : value.enabled === false ? 'disabled' : !authReady ? 'missing-credential' : loading ? 'catalog-loading' : activationError ? 'error' : !models.length ? (catalogError ? 'error' : 'catalog-loading') : !models.some((m) => value.modelSelection?.[m.id] !== false) ? 'no-models' : freshness === 'stale' ? 'stale' : 'ready'
     return {
+      pluginVersion: packageManifest.version,
       revision, ...(value.generation ? { generation: value.generation } : {}), ...(value.operationId ? { operationId: value.operationId } : {}),
       configured, enabled: value.enabled !== false, baseURL: value.baseURL ?? null,
       authMode: value.authIdentity?.type === 'missing' ? 'record' : value.authIdentity?.type ?? null,
