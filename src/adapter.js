@@ -75,7 +75,14 @@ export function createGatewayAdapter(ctx, snapshot, diagnostics, onMissing = () 
       imageOffloadCountQuantum: captured.policy?.imageOffloadCountQuantum ?? Math.min(10, captured.policy?.maxRequestImages ?? 50),
       requestImagePixelBudget: captured.policy?.requestImagePixelBudget ?? 2048 * 2048, requestImageMaxBytes: captured.policy?.requestImageMaxBytes ?? 1024 * 1024,
       retryPolicy: resolveRetryPolicy(captured.policy?.retryPolicy ?? DEFAULT_RETRY_POLICY, 'CPA'),
-      modelErrors: new Map(), configuredMaxTokens: new Map(),
+      modelErrors: new Map(),
+      // Publish explicit limits through DSH's normal model-info contract.
+      // Context middleware cannot distinguish an SDK-clamped request from a
+      // deliberate small budget using the wire payload alone.
+      configuredMaxTokens: new Map(models.flatMap(({ id }) => {
+        const limit = Object.hasOwn(captured.overrides ?? {}, id) ? captured.overrides[id]?.maxTokens : undefined
+        return Number.isSafeInteger(limit) && limit > 0 ? [[id, limit]] : []
+      })),
     }
     profiles = new Map([[PROVIDER, profile]])
   }
