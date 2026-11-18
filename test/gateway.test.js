@@ -226,6 +226,7 @@ test('own CPA connection can publish a native route without a generic provider p
     assert.equal(updated.body.value.models[0].catalogSources.maxTokens, 'override')
     const registered = await ctx.llm.resolveModelInfo('CLIProxyAPI', 'fixture-model')
     assert.equal(registered.context.contextWindow, 1048576)
+    assert.equal(registered.defaultMaxTokens, 8192, 'middleware reads the explicit output ceiling from DSH model info')
     for await (const _chunk of ctx.llm.stream(options)) { }
     assert.equal(requests.at(-1).payload.max_output_tokens, 8192)
     assert.equal((await post(patch)).status, 200, 'exact retry is idempotent')
@@ -250,7 +251,9 @@ test('own CPA connection can publish a native route without a generic provider p
     assert.equal(combined.status, 200)
     assert.deepEqual(combined.body.value.modelLimits, { 'fixture-model': { contextWindow: 262144 } })
     assert.equal(combined.body.value.models[0].catalogSources.maxTokens, 'default')
-    assert.equal((await ctx.llm.resolveModelInfo('CLIProxyAPI', 'fixture-model')).context.contextWindow, 262144)
+    const restored = await ctx.llm.resolveModelInfo('CLIProxyAPI', 'fixture-model')
+    assert.equal(restored.context.contextWindow, 262144)
+    assert.equal(restored.defaultMaxTokens, undefined, 'a fallback is not an explicitly configured output ceiling')
     catalogAvailable = true
   } finally {
     for (const fiber of fibers.reverse()) await fiber.dispose().catch(() => { })
