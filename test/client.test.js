@@ -117,6 +117,36 @@ test('every dictionary carries the same keys so no copy falls back to English', 
   for (const language of ['en', 'ru', 'zh']) for (const key of keys) assert.ok(String(dict[language][key]).trim(), `${language}:${key}`)
 })
 
+test('model limits use editable per-model drafts, reject invalid input and reset independently', async () => {
+  const h = await harness({ ...state(), modelLimits: { one: { maxTokens: 500 } } })
+  const limit = (name) => find(h.render(), (node) => node.type === 'input' && node.props.name === name)[0]
+  const change = (name, value) => limit(name).props.onChange({ currentTarget: { value } })
+  const save = () => h.button(h.render(), 'saveModelSettings').props.onClick()
+  assert.equal(limit('one:contextWindow').props.placeholder, '10000')
+  assert.equal(limit('one:maxTokens').props.value, '500')
+  change('one:contextWindow', '1.5')
+  await save()
+  assert.equal(h.calls.length, 0)
+  assert.match(text(h.render()), /limitsInvalid/)
+  change('one:contextWindow', '1048576')
+  change('one:maxTokens', '')
+  await save()
+  assert.deepEqual(h.calls[0].limitChanges, { one: { contextWindow: 1048576, maxTokens: null } })
+})
+
+test('changing endpoint invalidates unsaved model limits before preview and save', async () => {
+  const h = await harness({ ...state(), modelLimits: {} })
+  const input = () => find(h.render(), (node) => node.props.name === 'one:contextWindow')[0]
+  input().props.onChange({ currentTarget: { value: '1048576' } })
+  h.input(h.render(), 'url').props.onChange({ currentTarget: { value: 'https://new.example/v1' } })
+  assert.equal(input(), undefined)
+  find(h.render(), (node) => node.type === 'checkbox' && node.props.label === 'reuseConsent')[0].props.onChange(true)
+  await h.button(h.render(), 'loadModels').props.onClick()
+  assert.equal(input().props.value, '')
+  await find(h.render(), (node) => node.type === 'form')[0].props.onSubmit({ preventDefault() {} })
+  assert.equal(h.calls.at(-1).limitChanges, undefined)
+})
+
 test('selection-only saves use new CAS and keep connection draft', async () => {
   const h = await harness(); let tree = h.render()
   h.input(tree, 'url').props.onChange({ currentTarget: { value: 'https://draft.example/v1' } }); tree = h.render()

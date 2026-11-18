@@ -27,6 +27,8 @@ Restart the Web process or Desktop after installation or upgrade. On the sidebar
 
 Preview the catalog, search, and select models; bulk controls affect the whole loaded catalog. Save commits the address, authentication action, policy, and model draft together. Saving zero models is allowed but leaves the native route unavailable. Absent model choices are retained and newly discovered models default to enabled. Metadata, capability sources and reported reasoning efforts are available in model details. A failed refresh preserves the last good catalog as stale. A saved configuration is not proof of successful activation.
 
+For a model with missing or incorrect token limits, open **Model details → Token limits**, enter the context window or maximum output, then choose **Save model settings**. Clear either field to use the gateway value (or the plugin default if it is missing). These limits configure the DSH client; they cannot increase what the upstream model actually supports.
+
 The plugin also keeps a copy of the last saved connection outside the profile. If a profile rebuild, a core compatibility gate, or a reinstall removes the settings entry, the page offers **Restore saved connection**, so the address and credential do not have to be entered again.
 
 **Disable connection** retains the address, credential and model selection. **Forget key** is a separate action and can make the connection unavailable; it does not enable keyless authentication. Direct CPA API calls are unaffected.

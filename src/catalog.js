@@ -5,9 +5,18 @@ const CANONICAL_REASONING_LEVELS = new Set([
   'off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
 ])
 
+export function catalogOptions(config, settings) {
+  return {
+    defaultContextWindow: settings.policy?.defaultContextWindow ?? config.defaultContextWindow,
+    defaultMaxTokens: settings.policy?.defaultMaxTokens ?? config.defaultMaxTokens,
+    defaultInput: settings.policy?.defaultInput ?? config.defaultInput,
+    overrides: settings.overrides,
+  }
+}
+
 function positiveInteger(...values) {
   for (const value of values) {
-    if (typeof value === 'number' && Number.isInteger(value) && value > 0) return value
+    if (Number.isSafeInteger(value) && value > 0) return value
   }
 }
 
@@ -85,7 +94,7 @@ export function readCodexCatalogWithMetadata(body, options = {}) {
     const model = modelProfileOf(entry, options)
     if (!model || seen.has(model.id)) continue
     seen.add(model.id)
-    const override = options.overrides?.[model.id] ?? {}
+    const override = options.overrides && Object.hasOwn(options.overrides, model.id) ? options.overrides[model.id] ?? {} : {}
     const overrideContext = positiveInteger(override.contextWindow)
     const overrideMax = positiveInteger(override.maxTokens)
     const overrideInput = Array.isArray(override.inputModalities) && override.inputModalities.length && override.inputModalities.every((value) => value === 'text' || value === 'image') ? [...new Set(override.inputModalities)] : undefined

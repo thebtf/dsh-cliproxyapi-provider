@@ -252,7 +252,13 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function modelDetails(model, t) {
+    Object.assign(copy.en, { limits: 'Token limits', limitsHelp: 'Leave a field empty to use the CPA value or the default.', limitsInvalid: 'Enter positive whole numbers for token limits.', saveModelSettings: 'Save model settings' })
+    Object.assign(copy.ru, { limits: 'Лимиты токенов', limitsHelp: 'Оставьте поле пустым, чтобы использовать значение CPA или значение по умолчанию.', limitsInvalid: 'Укажите целые положительные числа для лимитов токенов.', saveModelSettings: 'Сохранить настройки моделей' })
+    Object.assign(copy.zh, { limits: '令牌限制', limitsHelp: '留空以使用 CPA 提供的值或默认值。', limitsInvalid: '令牌限制必须为正整数。', saveModelSettings: '保存模型设置' })
+
+    const limitFields = { contextWindow: 'context', maxTokens: 'output' }
+
+    function modelDetails(model, t, limitsEditor) {
       const raw = model.catalogMetadata && typeof model.catalogMetadata === 'object' ? model.catalogMetadata : {}
       const source = (key) => model.catalogSources?.[key] === 'default' ? t('sourceDefault') : model.catalogSources?.[key] === 'cpa' ? t('sourceCPA') : model.catalogSources?.[key] === 'override' ? t('sourceOverride') : ''
       const line = (label, value, provenance) => value === undefined || value === null ? null : React.createElement('p', null, label, ': ', String(value), provenance ? ' (' + provenance + ')' : '')
@@ -262,6 +268,7 @@ window.__ModuleLoader__.load({
           line(t('context'), model.contextWindow?.toLocaleString(), source('contextWindow')),
           line(t('output'), model.maxTokens?.toLocaleString(), source('maxTokens')),
           line(t('modalities'), (model.inputModalities || model.input || []).join(', '), source('inputModalities')),
+          limitsEditor,
           raw.description != null ? React.createElement('p', null, t('description'), ': ', metadataValue(raw.description, t)) : null,
           raw.default_reasoning_level != null ? React.createElement('p', null, t('defaultEffort'), ': ', metadataValue(raw.default_reasoning_level, t)) : null,
           Array.isArray(raw.supported_reasoning_levels) ? React.createElement('div', null,
@@ -308,7 +315,9 @@ window.__ModuleLoader__.load({
       const [policy, setPolicy] = useState('{}')
       const [protocol, setProtocol] = useState(PROTOCOLS[0])
       const [draft, setDraft] = useState({})
+      const [limitDraft, setLimitDraft] = useState({})
       const [models, setModels] = useState(null)
+      const [limitCatalogCurrent, setLimitCatalogCurrent] = useState(true)
       const [search, setSearch] = useState('')
       const [busy, setBusy] = useState(false)
       const [feedback, setFeedback] = useState('')
@@ -329,8 +338,9 @@ window.__ModuleLoader__.load({
       }, [viewMode])
       const complete = (operation, value) => {
         setState(value); setModels(value.models || []); setPending(null); setFeedback(t('saved'))
-        if (operation.type === 'save-connection') { setDraft({}); setApiKey(''); setAuthType('keep') }
+        if (operation.type === 'save-connection') { setDraft({}); setApiKey(''); setAuthType('keep'); setLimitCatalogCurrent(true) }
         if (operation.type === 'save-selection') setDraft({})
+        if (operation.type === 'save-connection' || operation.type === 'save-selection') setLimitDraft({})
       }
       const reconcile = async (operation) => {
         try {
@@ -377,6 +387,24 @@ window.__ModuleLoader__.load({
         } catch { setFeedback(t('uncertain')) }
         finally { setBusy(false) }
       }
+      const invalidateModelCatalog = () => {
+        requestGeneration.current += 1
+        setLimitCatalogCurrent(false)
+        setLimitDraft({})
+      }
+      const modelEdits = () => {
+        const changes = Object.entries(limitDraft).map(([id, limits]) => [id, Object.fromEntries(Object.entries(limits).map(([key, raw]) => {
+          const value = raw.trim()
+          if (!value) return [key, null]
+          if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) <= 0) throw new Error(t('limitsInvalid'))
+          return [key, Number(value)]
+        }))])
+        return { selectionChanges: draft, ...(changes.length ? { limitChanges: Object.fromEntries(changes) } : {}) }
+      }
+      const saveModelSettings = () => {
+        try { return mutate('save-selection', modelEdits()) }
+        catch { setFeedback(t('limitsInvalid')) }
+      }
       const submit = (event) => {
         event.preventDefault()
         try {
@@ -387,8 +415,8 @@ window.__ModuleLoader__.load({
           if (authType === 'replace' && !apiKey) throw new Error(t('keyRequired'))
           if (authType === 'reference' && !reference.trim()) throw new Error(t('referenceRequired'))
           const authEdit = authType === 'replace' ? { type: 'replace', key: apiKey } : authType === 'reference' ? { type: 'reference', ref: reference.trim(), allowEndpointReuse: reuse } : authType === 'keep' ? { type: 'keep', allowEndpointReuse: reuse } : { type: 'none' }
-          return mutate('save-connection', { baseURL: baseURL.trim(), authEdit, policy: parsedPolicy, selectionChanges: draft })
-        } catch (error) { setFeedback([t('baseRequired'), t('baseInvalid'), t('keyRequired'), t('referenceRequired')].includes(error.message) ? error.message : t('policyInvalid')) }
+          return mutate('save-connection', { baseURL: baseURL.trim(), authEdit, policy: parsedPolicy, ...modelEdits() })
+        } catch (error) { setFeedback([t('baseRequired'), t('baseInvalid'), t('keyRequired'), t('referenceRequired'), t('limitsInvalid')].includes(error.message) ? error.message : t('policyInvalid')) }
       }
       const preview = async () => {
         const generation = ++requestGeneration.current
@@ -398,17 +426,23 @@ window.__ModuleLoader__.load({
           if (state?.baseURL && !sameEndpoint(state.baseURL, baseURL.trim()) && state?.keyConfigured && !(authType === 'replace' && apiKey) && !reuse) throw new Error(t('reuseRequired'))
           if (authType === 'none' && state?.keyConfigured) throw new Error(t('previewNone'))
           const value = await command({ type: 'preview-models', baseURL: baseURL.trim(), ...(authType === 'replace' && apiKey ? { apiKey } : {}), allowEndpointReuse: reuse })
-          if (generation === requestGeneration.current) setModels(value)
+          if (generation === requestGeneration.current) {
+            setModels(value)
+            setLimitCatalogCurrent(authType === 'keep' || authType === 'replace' && !!apiKey)
+          }
         } catch (error) { if (generation === requestGeneration.current) setFeedback([t('reuseRequired'), t('previewNone')].includes(error.message) ? error.message : t('loadFailed')) }
         finally { if (generation === requestGeneration.current) setBusy(false) }
       }
       const refresh = async () => {
         setBusy(true); setFeedback('')
-        try { const value = await command({ type: 'refresh-models', connectionGeneration: state.generation }); setState(value); setModels(value.models || []) }
+        try { const value = await command({ type: 'refresh-models', connectionGeneration: state.generation }); setState(value); setModels(value.models || []); setLimitCatalogCurrent(true) }
         catch { setFeedback(t('loadFailed')); try { setState(await readState()) } catch { } }
         finally { setBusy(false) }
       }
       const list = models || []
+      const savedLimits = state?.modelLimits
+      const savedEndpoint = !!state?.configured && sameEndpoint(state.baseURL, baseURL.trim())
+      const savedCatalogDraft = savedEndpoint && authType === 'keep'
       const selected = (model) => Object.hasOwn(draft, model.id) ? draft[model.id] : state?.modelSelection?.[model.id] !== false
       const filtered = list.filter((model) => (model.name || '').toLowerCase().includes(search.toLowerCase()) || model.id.toLowerCase().includes(search.toLowerCase()))
       const button = (label, action, disabled = !writable, variant = 'ghost', size) => React.createElement(Button, { type: 'button', variant, size, disabled, onClick: action }, t(label))
@@ -462,20 +496,20 @@ window.__ModuleLoader__.load({
               React.createElement('select', { className: 'cpa-select', name: 'protocol', value: protocol, disabled: !writable, onChange: (event) => setProtocol(event.currentTarget.value) }, PROTOCOLS.map((value) => React.createElement('option', { key: value, value }, t(protocolKeys[value])))),
               React.createElement('span', { className: 'cpa-select-chevron', 'aria-hidden': 'true' }),
             ), t('protocolHelp')),
-            field(t('baseURL'), React.createElement(Input, { type: 'url', placeholder: 'https://gateway.example.com', value: baseURL, disabled: !writable, onChange: (event) => { requestGeneration.current += 1; setBaseURL(event.currentTarget.value); setReuse(false); setApiKey('') } }), t('baseURLHelp')),
+            field(t('baseURL'), React.createElement(Input, { type: 'url', placeholder: 'https://gateway.example.com', value: baseURL, disabled: !writable, onChange: (event) => { const value = event.currentTarget.value; if (!sameEndpoint(baseURL, value)) { invalidateModelCatalog(); setReuse(false); setApiKey('') }; setBaseURL(value) } }), t('baseURLHelp')),
             baseURL.trim().toLowerCase().startsWith('http:') ? React.createElement('p', { className: 'cpa-note', 'data-tone': 'warn', role: 'note' }, t('httpWarning')) : null,
             field(t('authAction'), React.createElement('span', { className: 'cpa-select-wrap' },
-              React.createElement('select', { className: 'cpa-select', name: 'authAction', value: authType, disabled: !writable, onChange: (event) => setAuthType(event.currentTarget.value) }, ['keep', 'replace', 'reference', 'none'].map((type) => React.createElement('option', { key: type, value: type }, t('auth' + type)))),
+              React.createElement('select', { className: 'cpa-select', name: 'authAction', value: authType, disabled: !writable, onChange: (event) => { invalidateModelCatalog(); setAuthType(event.currentTarget.value) } }, ['keep', 'replace', 'reference', 'none'].map((type) => React.createElement('option', { key: type, value: type }, t('auth' + type)))),
               React.createElement('span', { className: 'cpa-select-chevron', 'aria-hidden': 'true' }),
             )),
-            authType === 'replace' ? field(t('apiKey'), React.createElement(Input, { type: 'password', value: apiKey, autoComplete: 'off', disabled: !writable || !state?.keyWritable, onChange: (event) => setApiKey(event.currentTarget.value) })) : null,
-            authType === 'reference' ? field(t('reference'), React.createElement(Input, { value: reference, disabled: !writable, onChange: (event) => setReference(event.currentTarget.value) })) : null,
+            authType === 'replace' ? field(t('apiKey'), React.createElement(Input, { type: 'password', value: apiKey, autoComplete: 'off', disabled: !writable || !state?.keyWritable, onChange: (event) => { invalidateModelCatalog(); setApiKey(event.currentTarget.value) } })) : null,
+            authType === 'reference' ? field(t('reference'), React.createElement(Input, { value: reference, disabled: !writable, onChange: (event) => { invalidateModelCatalog(); setReference(event.currentTarget.value) } })) : null,
             state?.baseURL && !sameEndpoint(state.baseURL, baseURL.trim()) && (authType === 'keep' || authType === 'reference') ? React.createElement(Checkbox, { label: t('reuseConsent'), checked: reuse, disabled: !writable, onChange: setReuse }) : null,
             field(t('policy'), React.createElement('textarea', { className: 'cpa-textarea', value: policy, disabled: !writable, onChange: (event) => setPolicy(event.currentTarget.value) })),
           ),
           section(t('models'),
             React.createElement('p', { className: 'cpa-note', role: 'note' }, t('modelsHelp')),
-            React.createElement('div', { className: 'cpa-toolbar' }, button('loadModels', preview, !writable, 'outline'), button('refresh', refresh, !writable || !state?.generation)),
+            React.createElement('div', { className: 'cpa-toolbar' }, button('loadModels', preview, !writable, 'outline'), button('refresh', refresh, !writable || !state?.generation || !savedCatalogDraft)),
             field(t('search'), React.createElement(Input, { type: 'search', value: search, onChange: (event) => setSearch(event.currentTarget.value) })),
             React.createElement('div', { className: 'cpa-toolbar' },
               React.createElement('span', { className: 'cpa-count' }, list.filter(selected).length, ' / ', list.length, ' ', t('selectedCount')),
@@ -490,14 +524,28 @@ window.__ModuleLoader__.load({
                   model.name && model.name !== model.id ? React.createElement('span', { className: 'cpa-model-id' }, model.id) : null,
                 ),
                 modelEfforts(model, t),
-                modelDetails(model, t),
+                modelDetails(model, t, savedLimits && limitCatalogCurrent && React.createElement('details', { className: 'cpa-details' },
+                  React.createElement('summary', null, t('limits')),
+                  React.createElement('div', { className: 'cpa-details-body' },
+                    ...Object.entries(limitFields).map(([key, label]) => React.createElement('div', { key }, field(t(label), React.createElement(Input, {
+                      name: model.id + ':' + key, type: 'text', inputMode: 'numeric', disabled: !writable,
+                      placeholder: model.catalogSources?.[key] !== 'override' && model[key] != null ? String(model[key]) : undefined,
+                      value: (Object.hasOwn(limitDraft, model.id) ? limitDraft[model.id][key] : undefined) ?? String((savedCatalogDraft && Object.hasOwn(savedLimits, model.id) ? savedLimits[model.id][key] : undefined) ?? ''),
+                      onChange: (event) => {
+                        const value = event.currentTarget.value
+                        setLimitDraft((current) => ({ ...current, [model.id]: { ...(Object.hasOwn(current, model.id) ? current[model.id] : {}), [key]: value } }))
+                      },
+                    })))),
+                    note(t('limitsHelp')),
+                  ),
+                )),
               )))
               : React.createElement('p', { className: 'cpa-note' }, t('noModels')),
           ),
           section(t('actions'),
             React.createElement('div', { className: 'cpa-actions' },
               React.createElement(Button, { type: 'submit', variant: 'primary', disabled: !writable }, t('save')),
-              button('saveSelection', () => mutate('save-selection', { selectionChanges: draft }), !writable, 'outline'),
+              button(savedLimits ? 'saveModelSettings' : 'saveSelection', saveModelSettings, !writable || (Object.keys(limitDraft).length > 0 && !savedCatalogDraft), 'outline'),
               button(state?.enabled ? 'disconnect' : 'enableConnection', () => mutate('set-enabled', { enabled: !state.enabled }), !writable || !state?.configured),
               !state?.baseURL && state?.durable?.available ? button('restoreSaved', () => mutate('restore-connection'), !writable, 'outline') : null,
             ),
