@@ -15,7 +15,7 @@ https://raw.githubusercontent.com/thebtf/dsh-cliproxyapi-provider/main/market/in
 需要 Node.js 24.9.0 或更新版本。基于 DeepSeek Harness 0.2.2-rc.3 构建；`engines.dsh` 允许 `>=0.2.2-rc.3 <1.0.0` 以避免不必要的版本限制，但未来核心 API 的兼容性仍需测试。通过 npm 安装与更新：
 
 ```powershell
-npx @deepseek-ai/dsh plugin --profile web add '@thebtf/dsh-cliproxyapi-provider@0.5.1'
+npx @deepseek-ai/dsh plugin --profile web add '@thebtf/dsh-cliproxyapi-provider@0.5.2'
 npx @deepseek-ai/dsh web
 ```
 
@@ -26,6 +26,8 @@ npx @deepseek-ai/dsh web
 ![DeepSeek Harness 中的 CLIProxyAPI 设置页](market/screenshot-settings.png)
 
 预览目录后可搜索、选择模型；批量操作针对全部已加载模型。保存会一起提交地址、验证操作、策略和模型草稿。允许保存零个模型，但此时原生连接不可用。暂时缺失的模型选择会保留，新模型默认启用。模型详情显示元数据、能力来源和已声明的推理等级。刷新失败时保留上次可用目录并标记过期；保存成功不代表激活成功。
+
+如果模型的令牌限制缺失或不正确，请打开 **模型详情 → 令牌限制**，填写上下文窗口或最大输出，再选择 **保存模型设置**。清空字段可恢复网关提供的值；如果网关未提供，则使用插件默认值。这些限制用于 DSH 客户端，不能提高上游模型的实际容量。
 
 插件在配置文件之外还保留一份已保存连接的副本。如果配置文件被重建、设置条目被核心版本门禁停用或包被重装导致连接消失，页面会显示 **恢复已保存的连接**，无需重新输入地址和密钥。
 

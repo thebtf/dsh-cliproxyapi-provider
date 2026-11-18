@@ -4,7 +4,7 @@ import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { assertUsableApiKey, attributionHeaders } from '@deepseek-ai/dsh-llm'
 import { Config as PiAiConfig } from '@deepseek-ai/dsh-llm-pi-ai'
 import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
-import { catalogURL, readCodexCatalogWithMetadata } from './catalog.js'
+import { catalogOptions, catalogURL, readCodexCatalogWithMetadata } from './catalog.js'
 import { installGateway } from './gateway.js'
 import { protocolOf } from './policy.js'
 import { ConnectionError, resolveIdentity, validateEndpoint } from './connection.js'
@@ -369,10 +369,7 @@ export function apply(ctx, config) {
   ctx.llm.registerModelDiscovery(DISCOVERY_NS, discoverModels)
   installGateway(ctx, currentConfig, async (request, signal, key) => discoverCatalog(ctx, {
     baseURL: request.baseURL,
-    defaultContextWindow: request.policy?.defaultContextWindow ?? currentConfig().defaultContextWindow,
-    defaultMaxTokens: request.policy?.defaultMaxTokens ?? currentConfig().defaultMaxTokens,
-    defaultInput: request.policy?.defaultInput ?? currentConfig().defaultInput,
-    overrides: request.overrides,
+    ...catalogOptions(currentConfig(), request),
     headers: request.policy?.headers ?? {},
     fetchTimeoutMs: currentConfig().fetchTimeoutMs,
   }, key ?? '', signal), readBoundedJson, previewKey)

@@ -1,6 +1,17 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { saveConnection, validateEndpoint } from '../src/connection.js'
+import { applyLimitChanges, modelLimitsOf, saveConnection, validateEndpoint } from '../src/connection.js'
+
+test('limit changes preserve legacy metadata and validate the whole patch', () => {
+  const existing = { virtual: { contextWindow: 272000, inputModalities: ['text', 'image'] }, absent: { maxTokens: 8192 } }
+  const updated = applyLimitChanges(existing, { virtual: { contextWindow: null, maxTokens: 4096 } })
+  assert.deepEqual(updated, { virtual: { maxTokens: 4096, inputModalities: ['text', 'image'] }, absent: { maxTokens: 8192 } })
+  assert.deepEqual(modelLimitsOf(updated), { virtual: { maxTokens: 4096 }, absent: { maxTokens: 8192 } })
+  assert.equal(existing.virtual.contextWindow, 272000)
+  for (const patch of [{ maxTokens: 0 }, { maxTokens: 2.5 }, { maxTokens: '32' }, { contextWindow: Number.MAX_SAFE_INTEGER + 1 }, { inputModalities: ['text'] }]) {
+    assert.throws(() => applyLimitChanges(existing, { virtual: { maxTokens: 4096 }, absent: patch }), { code: 'INVALID_MODEL_LIMITS' })
+  }
+})
 
 function services(value = {}) {
   let state = { ns: 'llm-cliproxyapi', value, revision: 0 }

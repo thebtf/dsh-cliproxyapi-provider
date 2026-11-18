@@ -15,7 +15,7 @@ https://raw.githubusercontent.com/thebtf/dsh-cliproxyapi-provider/main/market/in
 Requires Node.js 24.9.0 or newer. Built against DeepSeek Harness 0.2.2-rc.3; `engines.dsh` permits `>=0.2.2-rc.3 <1.0.0` to avoid unnecessary version gating, but future core API compatibility still requires testing. Install and update through npm:
 
 ```powershell
-npx @deepseek-ai/dsh plugin --profile web add '@thebtf/dsh-cliproxyapi-provider@0.5.1'
+npx @deepseek-ai/dsh plugin --profile web add '@thebtf/dsh-cliproxyapi-provider@0.5.2'
 npx @deepseek-ai/dsh web
 ```
 
@@ -26,6 +26,8 @@ Restart the Web process or Desktop after installation or upgrade. On the sidebar
 ![The CLIProxyAPI settings page in DeepSeek Harness](market/screenshot-settings.png)
 
 Preview the catalog, search, and select models; bulk controls affect the whole loaded catalog. Save commits the address, authentication action, policy, and model draft together. Saving zero models is allowed but leaves the native route unavailable. Absent model choices are retained and newly discovered models default to enabled. Metadata, capability sources and reported reasoning efforts are available in model details. A failed refresh preserves the last good catalog as stale. A saved configuration is not proof of successful activation.
+
+For a model with missing or incorrect token limits, open **Model details → Token limits**, enter the context window or maximum output, then choose **Save model settings**. Clear either field to use the gateway value (or the plugin default if it is missing). These limits configure the DSH client; they cannot increase what the upstream model actually supports.
 
 The plugin also keeps a copy of the last saved connection outside the profile. If a profile rebuild, a core compatibility gate, or a reinstall removes the settings entry, the page offers **Restore saved connection**, so the address and credential do not have to be entered again.
 

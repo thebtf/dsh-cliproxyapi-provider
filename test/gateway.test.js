@@ -7,6 +7,8 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import { CredentialProvider } from '@deepseek-ai/dsh-credentials'
 import { LlmRuntime, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { Config, apply, inject, name } from '../src/index.js'
+import { readCatalogCache } from '../src/catalog-store.js'
+import { readConnectionSnapshot } from '../src/connection-store.js'
 
 test('own CPA connection can publish a native route without a generic provider profile', async () => {
   const routes = new Map()
@@ -74,10 +76,11 @@ test('own CPA connection can publish a native route without a generic provider p
   const catalogHeaders = []
   let inferenceCalls = 0
   let inferenceMode = 'complete'
+  let catalogAvailable = true
   globalThis.fetch = async (input, init) => {
     const url = input instanceof Request ? input.url : String(input)
     assert.ok(url.startsWith('https://cpa-fixture.invalid/'), `Unexpected external request: ${url}`)
-    if (/\/models(?:\?|$)/.test(url)) { catalogHeaders.push(new Headers(init.headers)); return Response.json({ models: [{ slug: 'fixture-model', supported_reasoning_levels: [{ effort: 'low' }, { effort: 'ultra' }] }] }) }
+    if (/\/models(?:\?|$)/.test(url)) { catalogHeaders.push(new Headers(init.headers)); if (!catalogAvailable) return new Response(null, { status: 503 }); return Response.json({ models: [{ slug: 'fixture-model', context_window: 272000, supported_reasoning_levels: [{ effort: 'low' }, { effort: 'ultra' }] }] }) }
     assert.match(url, /\/responses$/)
     inferenceCalls++
     if (inferenceMode === 'error') return new Response('unavailable', { status: 503 })
@@ -186,7 +189,7 @@ test('own CPA connection can publish a native route without a generic provider p
     assert.equal(initial.value.status, 'ready')
     assert.equal(initial.value.authMode, 'none')
     assert.equal(catalogHeaders[0].get('x-tenant'), 'tenant-a')
-    assert.equal(initial.value.models[0].contextWindow, 12345)
+    assert.equal(initial.value.models[0].contextWindow, 272000)
     assert.deepEqual(initial.value.models[0].inputModalities, ['text', 'image'])
     assert.ok(initial.value.diagnostics.some((entry) => entry.stage === 'sse-completed'))
     assert.ok(initial.value.diagnostics.some((entry) => entry.stage === 'http' && entry.requestId === 'fixture-request'))
@@ -210,6 +213,45 @@ test('own CPA connection can publish a native route without a generic provider p
     assert.ok(ctx.llm.listProviders().some((provider) => provider.id === 'CLIProxyAPI'))
     const stale = await post({ type: 'refresh-models', connectionGeneration: initial.value.generation })
     assert.equal(stale.status, 409)
+    const patch = { type: 'save-selection', expectedRevision: enabled.body.value.revision, operationId: 'limits', selectionChanges: {}, limitChanges: { 'fixture-model': { contextWindow: 1048576, maxTokens: 8192 } } }
+    const invalid = await post({ ...patch, limitChanges: { 'fixture-model': { contextWindow: 0 } } })
+    assert.equal(invalid.body.error.code, 'INVALID_MODEL_LIMITS')
+    const callsBefore = catalogHeaders.length
+    catalogAvailable = false
+    const updated = await post(patch)
+    assert.equal(updated.status, 200)
+    assert.equal(catalogHeaders.length, callsBefore, 'limits can be saved without contacting CPA')
+    assert.deepEqual(updated.body.value.modelLimits, patch.limitChanges)
+    assert.equal(updated.body.value.models[0].contextWindow, 1048576)
+    assert.equal(updated.body.value.models[0].catalogSources.maxTokens, 'override')
+    const registered = await ctx.llm.resolveModelInfo('CLIProxyAPI', 'fixture-model')
+    assert.equal(registered.context.contextWindow, 1048576)
+    for await (const _chunk of ctx.llm.stream(options)) { }
+    assert.equal(requests.at(-1).payload.max_output_tokens, 8192)
+    assert.equal((await post(patch)).status, 200, 'exact retry is idempotent')
+    assert.equal((await post({ ...patch, limitChanges: { 'fixture-model': { maxTokens: 2 } } })).status, 409)
+    const cache = await readCatalogCache(ctx.settings.documentPath, updated.body.value.generation, updated.body.value.baseURL, { type: 'none' })
+    assert.equal(cache.effective[0].contextWindow, 1048576)
+    assert.equal(cache.raw[0].context_window, 272000)
+    const snapshot = await readConnectionSnapshot(ctx.settings.documentPath)
+    assert.deepEqual(snapshot.overrides, patch.limitChanges)
+    const failedRefresh = await post({ type: 'refresh-models', connectionGeneration: updated.body.value.generation })
+    assert.equal(failedRefresh.status, 502)
+    assert.equal((await ctx.llm.resolveModelInfo('CLIProxyAPI', 'fixture-model')).context.contextWindow, 1048576)
+    catalogAvailable = true
+    const refreshedLimits = await post({ type: 'refresh-models', connectionGeneration: updated.body.value.generation })
+    assert.equal(refreshedLimits.body.value.models[0].maxTokens, 8192)
+    const reset = await post({ ...patch, expectedRevision: updated.body.value.revision, operationId: 'reset-limits', limitChanges: { 'fixture-model': { contextWindow: null } } })
+    assert.equal(reset.body.value.models[0].contextWindow, 272000)
+    assert.equal(reset.body.value.models[0].catalogSources.contextWindow, 'cpa')
+    assert.equal(reset.body.value.models[0].maxTokens, 8192)
+    catalogAvailable = false
+    const combined = await post({ type: 'save-connection', expectedRevision: reset.body.value.revision, operationId: 'combined-limits', baseURL: 'https://cpa-fixture.invalid/v1', authEdit: { type: 'keep' }, limitChanges: { 'fixture-model': { contextWindow: 262144, maxTokens: null } } })
+    assert.equal(combined.status, 200)
+    assert.deepEqual(combined.body.value.modelLimits, { 'fixture-model': { contextWindow: 262144 } })
+    assert.equal(combined.body.value.models[0].catalogSources.maxTokens, 'default')
+    assert.equal((await ctx.llm.resolveModelInfo('CLIProxyAPI', 'fixture-model')).context.contextWindow, 262144)
+    catalogAvailable = true
   } finally {
     for (const fiber of fibers.reverse()) await fiber.dispose().catch(() => { })
     globalThis.fetch = previousFetch

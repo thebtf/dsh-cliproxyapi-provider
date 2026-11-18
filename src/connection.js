@@ -12,6 +12,35 @@ export class ConnectionError extends Error {
   }
 }
 
+const limitFields = ['contextWindow', 'maxTokens']
+const positive = (value) => Number.isSafeInteger(value) && value > 0
+const isRecord = (value) => value && typeof value === 'object' && !Array.isArray(value)
+
+export function applyLimitChanges(overrides, changes) {
+  if (!isRecord(changes)) throw new ConnectionError('INVALID_MODEL_LIMITS', 'Invalid model limits')
+  const next = new Map(Object.entries(overrides ?? {}))
+  for (const [id, patch] of Object.entries(changes)) {
+    if (!id.trim() || !isRecord(patch) || !Object.keys(patch).length || Object.entries(patch).some(([field, value]) => !limitFields.includes(field) || (value !== null && !positive(value)))) {
+      throw new ConnectionError('INVALID_MODEL_LIMITS', 'Model limits must be positive integers or null to reset')
+    }
+    const entry = { ...next.get(id) }
+    for (const [field, value] of Object.entries(patch)) {
+      if (value === null) delete entry[field]
+      else entry[field] = value
+    }
+    if (Object.keys(entry).length) next.set(id, entry)
+    else next.delete(id)
+  }
+  return Object.fromEntries(next)
+}
+
+export function modelLimitsOf(overrides) {
+  return Object.fromEntries(Object.entries(overrides ?? {}).flatMap(([id, entry]) => {
+    const fields = limitFields.filter((field) => positive(entry?.[field]))
+    return fields.length ? [[id, Object.fromEntries(fields.map((field) => [field, entry[field]]))]] : []
+  }))
+}
+
 export function validateEndpoint(input) {
   if (typeof input !== 'string' || !input.trim() || input !== input.trim()) throw new ConnectionError('INVALID_URL', 'A valid endpoint is required')
   let parsed
@@ -52,9 +81,10 @@ export async function saveConnection(settings, credentials, input) {
   const current = descriptor(settings)
   if (!Number.isSafeInteger(input.expectedRevision)) throw new ConnectionError('SETTINGS_CONFLICT', 'Connection settings have changed')
   if (typeof input.operationId !== 'string' || !input.operationId || input.operationId.length > 256) throw new ConnectionError('INVALID_OPERATION', 'An operation ID is required')
+  const overrides = input.limitChanges === undefined ? undefined : applyLimitChanges(current.value?.overrides, input.limitChanges)
   if (current.value?.operationId === input.operationId) {
     const same = storedEndpoint(current.value.baseURL) === storedEndpoint(input.baseURL) && JSON.stringify(current.value.policy ?? {}) === JSON.stringify(input.policy ?? current.value.policy ?? {}) && Object.entries(input.selectionChanges ?? {}).every(([id, selected]) => current.value.modelSelection?.[id] === selected)
-    if (!same) throw new ConnectionError('OPERATION_CONFLICT', 'Operation ID was already used for a different draft')
+    if (!same || (overrides && JSON.stringify(overrides) !== JSON.stringify(current.value.overrides ?? {}))) throw new ConnectionError('OPERATION_CONFLICT', 'Operation ID was already used for a different draft')
     const identity = current.value.authIdentity
     if (input.authEdit?.type === 'none' && identity?.type !== 'none' || input.authEdit?.type === 'reference' && (identity?.type !== 'reference' || identity.ref !== input.authEdit.ref) || input.authEdit?.type === 'replace' && (identity?.type !== 'record' || await resolveIdentity(credentials, identity) !== input.authEdit.key)) throw new ConnectionError('OPERATION_CONFLICT', 'Operation ID was already used for a different draft')
     return { revision: current.revision, generation: current.value.generation, operationId: input.operationId }
@@ -103,6 +133,7 @@ export async function saveConnection(settings, credentials, input) {
     baseURL, authIdentity: identity, enabled: previous.enabled ?? true,
     policy: input.policy ?? previous.policy ?? {},
     modelSelection: { ...(previous.modelSelection ?? {}), ...(input.selectionChanges ?? {}) },
+    ...(overrides ? { overrides } : {}),
     operationId: input.operationId, generation,
   }
   const ops = Object.entries(values).map(([key, value]) => ({ op: 'set', path: [key], value }))

@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto'
 import packageManifest from '../package.json' with { type: 'json' }
-import { ConnectionError, resolveIdentity, saveConnection, validateEndpoint } from './connection.js'
+import { ConnectionError, applyLimitChanges, modelLimitsOf, resolveIdentity, saveConnection, validateEndpoint } from './connection.js'
 import { readCatalogCache, writeCatalogCache } from './catalog-store.js'
 import { legacyView, prepareLegacy, cutoverLegacy, finishLegacy, rollbackLegacy, discardPrepared } from './migration.js'
 import { createGatewayAdapter } from './adapter.js'
+import { catalogOptions, readCodexCatalogWithMetadata } from './catalog.js'
 import { validatePolicy } from './policy.js'
 import { credentialField } from './secrets.js'
 import { readConnectionSnapshot, removeConnectionSnapshot, writeConnectionSnapshot } from './connection-store.js'
@@ -20,8 +21,8 @@ const generationFor = (id, revision) => createHash('sha256').update(id).update('
 const fields = {
   'preview-models': ['type', 'baseURL', 'apiKey', 'allowEndpointReuse'],
   'refresh-models': ['type', 'connectionGeneration'],
-  'save-connection': ['type', 'expectedRevision', 'operationId', 'baseURL', 'authEdit', 'policy', 'selectionChanges'],
-  'save-selection': ['type', 'expectedRevision', 'operationId', 'selectionChanges'],
+  'save-connection': ['type', 'expectedRevision', 'operationId', 'baseURL', 'authEdit', 'policy', 'selectionChanges', 'limitChanges'],
+  'save-selection': ['type', 'expectedRevision', 'operationId', 'selectionChanges', 'limitChanges'],
   'set-enabled': ['type', 'expectedRevision', 'operationId', 'enabled'],
   'forget-key': ['type', 'expectedRevision', 'operationId'],
   'import-legacy': ['type', 'expectedRevision', 'operationId', 'expectedLegacyRevision', 'fingerprint'],
@@ -161,7 +162,7 @@ export function installGateway(ctx, config, discover, readJson, previewKey) {
       configured, enabled: value.enabled !== false, baseURL: value.baseURL ?? null,
       authMode: value.authIdentity?.type === 'missing' ? 'record' : value.authIdentity?.type ?? null,
       keyConfigured, keyWritable: ctx.settings.writable !== false,
-      modelSelection: value.modelSelection ?? {}, policy: safeObject(value.policy ?? {}), models,
+      modelSelection: value.modelSelection ?? {}, modelLimits: modelLimitsOf(value.overrides), policy: safeObject(value.policy ?? {}), models,
       status, catalog: { freshness: loading ? 'loading' : freshness, ...(compatibleCatalog(value) ? { fetchedAt: catalog.fetchedAt } : {}), ...(catalogError ? { error: catalogError } : {}) },
       diagnostics: [...diagnostics], ...(activationError ? { activationError } : {}), ...(recoveryError ? { recoveryError } : {}),
       durable: saved, legacy: legacyView(ctx.settings),
@@ -231,6 +232,9 @@ export function installGateway(ctx, config, discover, readJson, previewKey) {
     }
     if (before.revision !== input.expectedRevision) throw new ConnectionError('SETTINGS_CONFLICT', 'Connection settings have changed')
     const generation = generationFor(input.operationId, before.revision)
+    const projected = Object.hasOwn(values, 'overrides') && compatibleCatalog(before.value ?? {})
+      ? { ...catalog, generation, effective: readCodexCatalogWithMetadata({ models: catalog.raw }, catalogOptions(config(), { ...before.value, ...values })).discovery }
+      : undefined
     const ops = Object.entries({ ...values, operationId: input.operationId, generation }).map(([key, value]) => ({ op: 'set', path: [key], value }))
     try { await ctx.settings.mutate(NS, ops, before.revision) } catch (error) {
       if (error?.code === 'SETTINGS_CONFLICT') throw error
@@ -238,8 +242,8 @@ export function installGateway(ctx, config, discover, readJson, previewKey) {
     }
     if (descriptor().value?.operationId !== input.operationId) throw new ConnectionError('UNKNOWN', 'Save outcome is unknown; read state before retrying')
     cancelWake(); abortRefreshes()
-    if (catalog && catalog.generation === before.value?.generation) {
-      catalog = { ...catalog, generation }
+    if (projected || compatibleCatalog(before.value ?? {})) {
+      catalog = projected ?? { ...catalog, generation }
       try { await writeCatalogCache(ctx.settings.documentPath, catalog) } catch { freshness = 'stale'; catalogError = errorView('CACHE_UNAVAILABLE', 'Catalog cache could not be saved') }
     }
     await activate()
@@ -274,10 +278,14 @@ export function installGateway(ctx, config, discover, readJson, previewKey) {
       // save itself succeeded, so a rejected draft leaves the legacy route intact.
       let save = input
       let adopted = false
-      if (!current().baseURL) {
+      const before = descriptor()
+      if (!before.value?.baseURL) {
         const summary = legacyView(ctx.settings)
         if (summary.available) {
-          await prepareLegacy(ctx.settings, { expectedRevision: descriptor().revision, expectedLegacyRevision: summary.revision, fingerprint: summary.fingerprint, operationId: input.operationId + ':adopt' })
+          if (typeof input.operationId !== 'string' || !input.operationId || input.operationId.length > 256) throw new ConnectionError('INVALID_OPERATION', 'An operation ID is required')
+          if (before.revision !== input.expectedRevision) throw new ConnectionError('SETTINGS_CONFLICT', 'Connection settings have changed')
+          if (input.limitChanges !== undefined) applyLimitChanges(before.value?.overrides, input.limitChanges)
+          await prepareLegacy(ctx.settings, { expectedRevision: before.revision, expectedLegacyRevision: summary.revision, fingerprint: summary.fingerprint, operationId: input.operationId + ':adopt' })
           save = { ...input, expectedRevision: descriptor().revision }
           adopted = true
         } else if (ctx.settings.describe().find((row) => row.ns === 'llm-pi-ai')?.value?.providers?.[PROVIDER]) {
@@ -296,14 +304,29 @@ export function installGateway(ctx, config, discover, readJson, previewKey) {
       }
       if (adopted) await cutoverLegacy(ctx.settings)
       const value = current()
-      if (previous.generation !== value.generation) { cancelWake(); abortRefreshes(); failures = 0; catalog = undefined; freshness = 'empty'; catalogError = undefined }
+      if (previous.generation !== value.generation) {
+        cancelWake(); abortRefreshes(); failures = 0; catalogError = undefined
+        const reusable = compatibleCatalog(previous) && previous.baseURL === value.baseURL &&
+          JSON.stringify(previous.authIdentity) === JSON.stringify(value.authIdentity) &&
+          JSON.stringify(previous.policy?.headers ?? {}) === JSON.stringify(value.policy?.headers ?? {})
+        catalog = reusable ? {
+          ...catalog, generation: value.generation,
+          effective: readCodexCatalogWithMetadata({ models: catalog.raw }, catalogOptions(config(), value)).discovery,
+        } : undefined
+        freshness = catalog ? 'stale' : 'empty'
+        if (catalog) {
+          try { await writeCatalogCache(ctx.settings.documentPath, catalog) } catch { catalogError = errorView('CACHE_UNAVAILABLE', 'Catalog cache could not be saved') }
+        }
+      }
       try { await refresh(value.generation, signal) } catch { await activate() }
       await persist(current())
       return view()
     }
     if (input.type === 'save-selection') {
       if (!input.selectionChanges || typeof input.selectionChanges !== 'object' || Array.isArray(input.selectionChanges) || Object.values(input.selectionChanges).some((x) => typeof x !== 'boolean')) throw new ConnectionError('INVALID_SELECTION', 'Invalid model selection')
-      await mutate(input, { modelSelection: { ...(current().modelSelection ?? {}), ...input.selectionChanges } })
+      const value = current()
+      const overrides = input.limitChanges === undefined ? undefined : applyLimitChanges(value.overrides, input.limitChanges)
+      await mutate(input, { modelSelection: { ...(value.modelSelection ?? {}), ...input.selectionChanges }, ...(overrides ? { overrides } : {}) })
       return view()
     }
     if (input.type === 'set-enabled') {
