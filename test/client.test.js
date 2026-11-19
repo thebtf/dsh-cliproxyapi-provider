@@ -117,6 +117,30 @@ test('every dictionary carries the same keys so no copy falls back to English', 
   for (const language of ['en', 'ru', 'zh']) for (const key of keys) assert.ok(String(dict[language][key]).trim(), `${language}:${key}`)
 })
 
+test('enabled models lead on entry and rows stay put through edits and saving', async () => {
+  const models = ['off-a', 'on-a', 'off-b', 'on-b'].map((id) => ({ id, name: 'Model ' + id }))
+  const initial = { ...state(), models, modelLimits: {}, modelSelection: { 'off-a': false, 'off-b': false } }
+  const h = await harness(initial)
+  const rows = () => find(h.render(), (node) => node.type === 'checkbox' && node.props.label.startsWith('enabled '))
+  const labels = () => rows().map((node) => node.props.label)
+  const first = ['enabled Model on-a', 'enabled Model on-b', 'enabled Model off-a', 'enabled Model off-b']
+  assert.deepEqual(labels(), first)
+  rows()[2].props.onChange(true)
+  assert.deepEqual(labels(), first)
+  assert.equal(rows()[2].props.checked, true)
+  h.setReply((body) => ({ ok: true, value: { ...initial, revision: 8, modelSelection: { ...initial.modelSelection, ...body.selectionChanges } } }))
+  await h.button(h.render(), 'saveModelSettings').props.onClick()
+  assert.deepEqual(labels(), first)
+  const reopened = await harness({ ...initial, modelSelection: { 'off-b': false } })
+  assert.deepEqual(find(reopened.render(), (node) => node.type === 'checkbox' && node.props.label.startsWith('enabled ')).map((node) => node.props.label), [first[2], first[0], first[1], first[3]])
+  const search = (value) => h.input(h.render(), 'search').props.onChange({ currentTarget: { value } })
+  search('off-b')
+  assert.deepEqual(labels(), [first[3]])
+  search('not present')
+  assert.deepEqual(labels(), [])
+  assert.match(text(h.render()), /noMatches/)
+})
+
 test('limit editors are visible without opening model details', async () => {
   const h = await harness({ ...state(), modelLimits: {} })
   const card = find(h.render(), (node) => node.props.className === 'cpa-model')[0]

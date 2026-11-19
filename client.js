@@ -59,7 +59,7 @@ window.__ModuleLoader__.load({
         needOneModel: 'Enable at least one available model. DSH cannot save an empty provider catalog.',
         selectionUnavailable: 'Model selection settings are unavailable or read-only.',
         partialSave: 'Saving did not finish. The model selection, API key or profile may already have changed; reload settings and retry.',
-        search: 'Search models by name or ID', selectedCount: 'selected of', selectAll: 'Select all loaded models', deselectAll: 'Deselect all loaded models',
+        search: 'Search models by name or ID', selectedCount: 'selected', selectAll: 'Select all loaded models', deselectAll: 'Deselect all loaded models',
         noMatches: 'No models match your search.', enabled: 'Enable', details: 'Model details', rawDetails: 'All CPA fields',
         context: 'Context window', output: 'Maximum output', modalities: 'Input modalities', sourceDefault: 'default', sourceCPA: 'CPA',
         efforts: 'Reasoning efforts', defaultEffort: 'Default effort', description: 'Description', empty: 'Empty', effortUnknown: 'Reasoning efforts not reported',
@@ -98,7 +98,7 @@ window.__ModuleLoader__.load({
         needOneModel: '请至少启用一个可用模型。DSH 不支持保存空的供应商模型目录。',
         selectionUnavailable: '模型选择设置不可用或为只读。',
         partialSave: '保存未完成。模型选择、API Key 或配置可能已经更改；请重新加载设置后重试。',
-        search: '按名称或 ID 搜索模型', selectedCount: '已选 / 总数', selectAll: '全选已加载模型', deselectAll: '取消选择所有已加载模型',
+        search: '按名称或 ID 搜索模型', selectedCount: '已选', selectAll: '全选已加载模型', deselectAll: '取消选择所有已加载模型',
         noMatches: '没有匹配的模型。', enabled: '启用', details: '模型详情', rawDetails: '所有 CPA 字段',
         context: '上下文窗口', output: '最大输出', modalities: '输入类型', sourceDefault: '默认值', sourceCPA: 'CPA',
         efforts: '推理等级', defaultEffort: '默认等级', description: '描述', empty: '空', effortUnknown: '未提供推理等级',
@@ -106,7 +106,7 @@ window.__ModuleLoader__.load({
     }
     Object.assign(copy.en, { save: 'Save', saved: 'Changes saved.', statusNotConfigured: 'Not configured.', statusDisabled: 'Connection disabled.', statusMissingKey: 'Credential is missing.', statusLoading: 'Loading catalog…', statusReady: 'Ready.', statusStale: 'Catalog is stale.', statusReconfiguring: 'Reconfiguring…', statusNoModels: 'No selected usable models; the connection is not ready.', statusError: 'Connection error.', activationFailed: 'Saved, but activation failed. The connection is not ready.', catalogError: 'Catalog refresh failed; the last good catalog may be stale.', uncertain: 'The result is unknown. Your draft is preserved; check the operation before trying again.', conflict: 'Settings changed elsewhere. Your draft is preserved; review it before saving again.', operationId: 'Operation ID', reconcile: 'Check operation', authAction: 'Authentication action', authkeep: 'Keep current identity', authreplace: 'Replace with a key', authreference: 'Use a credential reference', authnone: 'No authentication', reference: 'Credential reference', keyRequired: 'Enter a key.', referenceRequired: 'Enter a credential reference.', reuseConsent: 'Allow the saved identity to be used with this endpoint', reuseRequired: 'Explicitly allow credential reuse before previewing this endpoint.', httpWarning: 'HTTP is not encrypted; credentials and requests can be exposed.', policy: 'Connection policy (JSON object)', policyInvalid: 'Enter a valid policy JSON object.', refresh: 'Refresh saved catalog', saveSelection: 'Save model selection only', disconnect: 'Disable connection', enableConnection: 'Enable connection', disconnectHelp: 'Disabling preserves the endpoint, key and model selection; existing sessions may fail until re-enabled.', forgetKey: 'Forget key', forgetHelp: 'Forgetting the key can make the connection unavailable; it does not select keyless authentication.', importLegacy: 'Import legacy connection', openSettings: 'Open Plugins, then select CLIProxyAPI', sourceOverride: 'override' })
     Object.assign(copy.zh, { save: '保存', saved: '更改已保存。', statusNotConfigured: '尚未配置。', statusDisabled: '连接已停用。', statusMissingKey: '缺少凭据。', statusLoading: '正在加载目录…', statusReady: '已就绪。', statusStale: '目录已过期。', statusReconfiguring: '正在重新配置…', statusNoModels: '没有已选可用模型；连接尚未就绪。', statusError: '连接错误。', activationFailed: '已保存，但激活失败。连接尚未就绪。', catalogError: '目录刷新失败；上次成功的目录可能已过期。', uncertain: '结果未知。草稿已保留；重试前请检查操作。', conflict: '设置已在其他位置更改。草稿已保留；保存前请检查。', operationId: '操作 ID', reconcile: '检查操作', authAction: '身份验证操作', authkeep: '保留当前身份', authreplace: '替换为密钥', authreference: '使用凭据引用', authnone: '不使用身份验证', reference: '凭据引用', keyRequired: '请输入密钥。', referenceRequired: '请输入凭据引用。', reuseConsent: '允许在此地址使用已保存的身份', reuseRequired: '预览此地址前请明确允许重用凭据。', httpWarning: 'HTTP 未加密，凭据和请求可能泄露。', policy: '连接策略（JSON 对象）', policyInvalid: '请输入有效的策略 JSON 对象。', refresh: '刷新已保存的目录', saveSelection: '仅保存模型选择', disconnect: '停用连接', enableConnection: '启用连接', disconnectHelp: '停用会保留地址、密钥和模型选择；重新启用前现有会话可能失败。', forgetKey: '忘记密钥', forgetHelp: '忘记密钥可能导致连接不可用；不会自动选择无验证模式。', importLegacy: '导入旧连接', openSettings: '打开插件，然后选择 CLIProxyAPI', sourceOverride: '用户覆盖' })
-    copy.ru = { title: 'CLIProxyAPI', intro: 'Подключение сервера CLIProxyAPI и выбор моделей.', connection: 'Подключение', actions: 'Действия', loading: 'Загрузка настроек…', unavailable: 'Настройки недоступны.', readOnly: 'Настройки доступны только для чтения.', baseURL: 'Адрес сервера', baseURLHelp: 'Адрес сервера. Завершающий /v1 можно не писать: в обоих случаях каталог читается из /v1/models, а каждый протокол получает путь, который добавляет его SDK сам.', apiKey: 'Ключ API', baseRequired: 'Укажите адрес.', baseInvalid: 'Укажите корректный HTTP или HTTPS адрес.', save: 'Сохранить', saved: 'Изменения сохранены.', loadModels: 'Предпросмотр моделей', loadFailed: 'Не удалось загрузить каталог.', modelsHelp: 'Отключённые модели недоступны в DSH; существующие сессии могут завершиться ошибкой. Прямые вызовы CPA не блокируются. Новые модели включены по умолчанию.', search: 'Поиск по имени или ID', selectedCount: 'выбрано из', selectAll: 'Выбрать все модели', deselectAll: 'Снять выбор со всех', noMatches: 'Модели не найдены.', enabled: 'Включить', details: 'Сведения о модели', rawDetails: 'Все поля CPA', context: 'Контекст', output: 'Максимальный вывод', modalities: 'Типы входа', sourceDefault: 'по умолчанию', sourceCPA: 'CPA', sourceOverride: 'переопределение', efforts: 'Уровни рассуждения', defaultEffort: 'Уровень по умолчанию', description: 'Описание', empty: 'Пусто', effortUnknown: 'Уровни рассуждения не указаны', statusNotConfigured: 'Не настроено.', statusDisabled: 'Подключение отключено.', statusMissingKey: 'Нет учётных данных.', statusLoading: 'Загрузка каталога…', statusReady: 'Готово.', statusStale: 'Каталог устарел.', statusReconfiguring: 'Применение настроек…', statusNoModels: 'Нет выбранных доступных моделей; подключение не готово.', statusError: 'Ошибка подключения.', activationFailed: 'Сохранено, но активация не удалась. Подключение не готово.', catalogError: 'Обновить каталог не удалось; предыдущая копия может устареть.', uncertain: 'Результат неизвестен. Черновик сохранён; проверьте операцию перед повтором.', conflict: 'Настройки изменены в другом месте. Черновик сохранён; проверьте его.', operationId: 'ID операции', reconcile: 'Проверить операцию', authAction: 'Авторизация', authkeep: 'Оставить текущие данные', authreplace: 'Заменить ключ', authreference: 'Использовать ссылку на данные', authnone: 'Без авторизации', reference: 'Ссылка на учётные данные', keyRequired: 'Укажите ключ.', referenceRequired: 'Укажите ссылку.', reuseConsent: 'Разрешить использовать сохранённые данные с этим адресом', reuseRequired: 'Для предпросмотра явно разрешите повторное использование данных.', httpWarning: 'HTTP не шифруется: ключ и запросы могут быть раскрыты.', policy: 'Политика подключения (объект JSON)', policyInvalid: 'Укажите корректный объект JSON.', refresh: 'Обновить сохранённый каталог', saveSelection: 'Сохранить только выбор моделей', disconnect: 'Отключить подключение', enableConnection: 'Включить подключение', disconnectHelp: 'Отключение сохраняет адрес, ключ и выбор моделей; существующие сессии могут перестать работать.', forgetKey: 'Забыть ключ', forgetHelp: 'Удаление ключа может сделать подключение недоступным и не включает режим без авторизации.', importLegacy: 'Импортировать прежнее подключение', openSettings: 'Открыть Plugins и выбрать CLIProxyAPI', tab: 'CLIProxyAPI', imageCapability: 'Ввод изображений включается автоматически для моделей, которые заявляют поддержку изображений.', apiKeyPlaceholder: 'Необязательно для сервера CLIProxyAPI без ключа', apiKeyConfiguredPlaceholder: 'Ключ API уже сохранён', credentialConfiguredLabel: 'Настроено', saving: 'Сохранение…', syncTimeout: 'Профиль сохранён, но возможности изображений и рассуждений не синхронизированы. Проверьте журналы обновления провайдера и повторите попытку.', noModels: 'CLIProxyAPI не вернул доступных моделей.', models: 'Доступные модели', loadingModels: 'Загрузка моделей…', metadataHelp: 'Контекст, лимиты вывода и типы входа — действующие настройки; если сервер их не сообщает, могут использоваться значения по умолчанию.', noEnabledRefresh: 'В текущем каталоге нет включённых моделей. Прежний список провайдера остаётся активным, пока вы не включите модель и не сохраните.', needOneModel: 'Включите хотя бы одну доступную модель. DSH не может сохранить пустой каталог провайдера.', selectionUnavailable: 'Настройки выбора моделей недоступны или только для чтения.', partialSave: 'Сохранение не завершено. Выбор моделей, ключ или профиль могли измениться; перезагрузите настройки и повторите.' }
+    copy.ru = { title: 'CLIProxyAPI', intro: 'Подключение сервера CLIProxyAPI и выбор моделей.', connection: 'Подключение', actions: 'Действия', loading: 'Загрузка настроек…', unavailable: 'Настройки недоступны.', readOnly: 'Настройки доступны только для чтения.', baseURL: 'Адрес сервера', baseURLHelp: 'Адрес сервера. Завершающий /v1 можно не писать: в обоих случаях каталог читается из /v1/models, а каждый протокол получает путь, который добавляет его SDK сам.', apiKey: 'Ключ API', baseRequired: 'Укажите адрес.', baseInvalid: 'Укажите корректный HTTP или HTTPS адрес.', save: 'Сохранить', saved: 'Изменения сохранены.', loadModels: 'Предпросмотр моделей', loadFailed: 'Не удалось загрузить каталог.', modelsHelp: 'Отключённые модели недоступны в DSH; существующие сессии могут завершиться ошибкой. Прямые вызовы CPA не блокируются. Новые модели включены по умолчанию.', search: 'Поиск по имени или ID', selectedCount: 'выбрано', selectAll: 'Выбрать все модели', deselectAll: 'Снять выбор со всех', noMatches: 'Модели не найдены.', enabled: 'Включить', details: 'Сведения о модели', rawDetails: 'Все поля CPA', context: 'Контекст', output: 'Максимальный вывод', modalities: 'Типы входа', sourceDefault: 'по умолчанию', sourceCPA: 'CPA', sourceOverride: 'переопределение', efforts: 'Уровни рассуждения', defaultEffort: 'Уровень по умолчанию', description: 'Описание', empty: 'Пусто', effortUnknown: 'Уровни рассуждения не указаны', statusNotConfigured: 'Не настроено.', statusDisabled: 'Подключение отключено.', statusMissingKey: 'Нет учётных данных.', statusLoading: 'Загрузка каталога…', statusReady: 'Готово.', statusStale: 'Каталог устарел.', statusReconfiguring: 'Применение настроек…', statusNoModels: 'Нет выбранных доступных моделей; подключение не готово.', statusError: 'Ошибка подключения.', activationFailed: 'Сохранено, но активация не удалась. Подключение не готово.', catalogError: 'Обновить каталог не удалось; предыдущая копия может устареть.', uncertain: 'Результат неизвестен. Черновик сохранён; проверьте операцию перед повтором.', conflict: 'Настройки изменены в другом месте. Черновик сохранён; проверьте его.', operationId: 'ID операции', reconcile: 'Проверить операцию', authAction: 'Авторизация', authkeep: 'Оставить текущие данные', authreplace: 'Заменить ключ', authreference: 'Использовать ссылку на данные', authnone: 'Без авторизации', reference: 'Ссылка на учётные данные', keyRequired: 'Укажите ключ.', referenceRequired: 'Укажите ссылку.', reuseConsent: 'Разрешить использовать сохранённые данные с этим адресом', reuseRequired: 'Для предпросмотра явно разрешите повторное использование данных.', httpWarning: 'HTTP не шифруется: ключ и запросы могут быть раскрыты.', policy: 'Политика подключения (объект JSON)', policyInvalid: 'Укажите корректный объект JSON.', refresh: 'Обновить сохранённый каталог', saveSelection: 'Сохранить только выбор моделей', disconnect: 'Отключить подключение', enableConnection: 'Включить подключение', disconnectHelp: 'Отключение сохраняет адрес, ключ и выбор моделей; существующие сессии могут перестать работать.', forgetKey: 'Забыть ключ', forgetHelp: 'Удаление ключа может сделать подключение недоступным и не включает режим без авторизации.', importLegacy: 'Импортировать прежнее подключение', openSettings: 'Открыть Plugins и выбрать CLIProxyAPI', tab: 'CLIProxyAPI', imageCapability: 'Ввод изображений включается автоматически для моделей, которые заявляют поддержку изображений.', apiKeyPlaceholder: 'Необязательно для сервера CLIProxyAPI без ключа', apiKeyConfiguredPlaceholder: 'Ключ API уже сохранён', credentialConfiguredLabel: 'Настроено', saving: 'Сохранение…', syncTimeout: 'Профиль сохранён, но возможности изображений и рассуждений не синхронизированы. Проверьте журналы обновления провайдера и повторите попытку.', noModels: 'CLIProxyAPI не вернул доступных моделей.', models: 'Доступные модели', loadingModels: 'Загрузка моделей…', metadataHelp: 'Контекст, лимиты вывода и типы входа — действующие настройки; если сервер их не сообщает, могут использоваться значения по умолчанию.', noEnabledRefresh: 'В текущем каталоге нет включённых моделей. Прежний список провайдера остаётся активным, пока вы не включите модель и не сохраните.', needOneModel: 'Включите хотя бы одну доступную модель. DSH не может сохранить пустой каталог провайдера.', selectionUnavailable: 'Настройки выбора моделей недоступны или только для чтения.', partialSave: 'Сохранение не завершено. Выбор моделей, ключ или профиль могли измениться; перезагрузите настройки и повторите.' }
     Object.assign(copy.en, { openSettings: 'Open Plugins', chooseCPA: 'Then select CLIProxyAPI.', saveFailed: 'The operation was refused. Your draft is preserved.', revision: 'Readback revision' })
     Object.assign(copy.ru, { openSettings: 'Открыть плагины', chooseCPA: 'Затем выберите CLIProxyAPI.', saveFailed: 'Операция отклонена. Черновик сохранён.', revision: 'Прочитанная версия' })
     Object.assign(copy.zh, { openSettings: '打开插件', chooseCPA: '然后选择 CLIProxyAPI。', saveFailed: '操作被拒绝，草稿已保留。', revision: '读取的版本' })
@@ -152,18 +152,22 @@ window.__ModuleLoader__.load({
 .cpa-toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0; }
 .cpa-count { font-size:12px; line-height:18px; color:var(--dsw-alias-label-tertiary); }
 .cpa-models { display:flex; flex-direction:column; min-width:0; max-height:min(520px,60vh); overflow-y:auto; scrollbar-gutter:stable; border:.5px solid var(--dsw-alias-border-l2); border-radius:var(--dsw-radius-lg); }
-.cpa-model { display:flex; flex-direction:column; gap:6px; min-width:0; padding:12px 14px; }
+.cpa-model-group { margin:0; padding:9px 14px; border-bottom:1px solid var(--dsw-alias-border-l2); font-size:13px; font-weight:600; color:var(--dsw-alias-label-primary); }
+.cpa-model + .cpa-model-group { border-top:1px solid var(--dsw-alias-border-l2); }
+.cpa-catalog-hint { max-width:70ch; }
+.cpa-model { display:flex; flex-direction:column; gap:6px; min-width:0; padding:10px 14px; }
 .cpa-model + .cpa-model { border-top:.5px solid var(--dsw-alias-border-l2); }
 .cpa-model-head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; min-width:0; }
 .cpa-model-id { min-width:0; font-family:var(--dsh-font-family-code-default); font-size:12px; line-height:18px; color:var(--dsw-alias-label-tertiary); overflow-wrap:anywhere; }
 .cpa-trace { margin-top:8px; }
 .cpa-trace-log { max-height:180px; overflow-y:auto; scrollbar-gutter:stable; }
 .cpa-model-meta { display:flex; flex-wrap:wrap; align-items:center; gap:6px; min-width:0; }
-.cpa-limits { min-width:0; margin:4px 0 2px; padding:0; border:0; }
-.cpa-limits > legend { padding:0; margin-bottom:4px; font-weight:600; color:var(--dsw-alias-label-primary); }
+.cpa-limits { position:relative; min-width:0; margin:0; padding:0; border:0; }
+.cpa-limits > legend { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 .cpa-limits-fields { display:flex; flex-wrap:wrap; gap:8px 12px; }
 .cpa-limits-fields > div { flex:1 1 10rem; min-width:0; max-width:16rem; }
-.cpa-limits > .cpa-note { margin-top:4px; }
+.cpa-limits input { width:100%; min-width:0; font-variant-numeric:tabular-nums; }
+.cpa-limits input::placeholder { color:var(--dsw-alias-label-secondary); opacity:1; }
 .cpa-details { min-width:0; font-size:12px; line-height:1.6; }
 .cpa-details > summary { cursor:pointer; color:var(--dsw-alias-label-tertiary); }
 .cpa-details > summary:hover { color:var(--dsw-alias-label-secondary); }
@@ -257,9 +261,9 @@ window.__ModuleLoader__.load({
       )
     }
 
-    Object.assign(copy.en, { limits: 'Token limits', limitsHelp: 'Leave a field empty to use the CPA value or the default.', limitsInvalid: 'Enter positive whole numbers for token limits.', saveModelSettings: 'Save model settings' })
-    Object.assign(copy.ru, { limits: 'Лимиты токенов', limitsHelp: 'Оставьте поле пустым, чтобы использовать значение CPA или значение по умолчанию.', limitsInvalid: 'Укажите целые положительные числа для лимитов токенов.', saveModelSettings: 'Сохранить настройки моделей' })
-    Object.assign(copy.zh, { limits: '令牌限制', limitsHelp: '留空以使用 CPA 提供的值或默认值。', limitsInvalid: '令牌限制必须为正整数。', saveModelSettings: '保存模型设置' })
+    Object.assign(copy.en, { limits: 'Token limits', limitsHelp: 'Token limits · Leave a field empty to use the CPA value or the default.', enabledModels: 'Enabled on entry', otherModels: 'Other models', limitsInvalid: 'Enter positive whole numbers for token limits.', saveModelSettings: 'Save model settings' })
+    Object.assign(copy.ru, { limits: 'Лимиты токенов', limitsHelp: 'Лимиты токенов: пустое поле использует значение CPA или значение по умолчанию.', enabledModels: 'Включённые при открытии', otherModels: 'Остальные модели', limitsInvalid: 'Укажите целые положительные числа для лимитов токенов.', saveModelSettings: 'Сохранить настройки моделей' })
+    Object.assign(copy.zh, { limits: '令牌限制', limitsHelp: '令牌限制：留空以使用 CPA 提供的值或默认值。', enabledModels: '打开时已启用', otherModels: '其他模型', limitsInvalid: '令牌限制必须为正整数。', saveModelSettings: '保存模型设置' })
 
     const limitFields = { contextWindow: 'context', maxTokens: 'output' }
 
@@ -320,6 +324,7 @@ window.__ModuleLoader__.load({
       const [policy, setPolicy] = useState('{}')
       const [protocol, setProtocol] = useState(PROTOCOLS[0])
       const [draft, setDraft] = useState({})
+      const [entrySelection, setEntrySelection] = useState({})
       const [limitDraft, setLimitDraft] = useState({})
       const [models, setModels] = useState(null)
       const [limitCatalogCurrent, setLimitCatalogCurrent] = useState(true)
@@ -337,6 +342,7 @@ window.__ModuleLoader__.load({
         readState().then((value) => {
           if (!active) return
           setState(value); setBaseURL(value.baseURL || ''); setPolicy(JSON.stringify(value.policy || {}, null, 2)); setModels(value.models || [])
+          setEntrySelection(value.modelSelection ?? {})
           setProtocol(PROTOCOLS.includes(value.policy?.api) ? value.policy.api : PROTOCOLS[0])
         }).catch(() => { if (active) setFeedback(t('unavailable')) })
         return () => { active = false; requestGeneration.current += 1 }
@@ -448,8 +454,19 @@ window.__ModuleLoader__.load({
       const savedLimits = state?.modelLimits
       const savedEndpoint = !!state?.configured && sameEndpoint(state.baseURL, baseURL.trim())
       const savedCatalogDraft = savedEndpoint && authType === 'keep'
-      const selected = (model) => Object.hasOwn(draft, model.id) ? draft[model.id] : state?.modelSelection?.[model.id] !== false
-      const filtered = list.filter((model) => (model.name || '').toLowerCase().includes(search.toLowerCase()) || model.id.toLowerCase().includes(search.toLowerCase()))
+      const savedSelected = (model) => state?.modelSelection?.[model.id] !== false
+      const selected = (model) => Object.hasOwn(draft, model.id) ? draft[model.id] : savedSelected(model)
+      const query = search.trim().toLowerCase()
+      const enabledModels = [], otherModels = []
+      for (const model of list) {
+        if (!(model.name || '').toLowerCase().includes(query) && !model.id.toLowerCase().includes(query)) continue
+        // Keep the entry grouping stable while editing and saving this visit.
+        if (entrySelection[model.id] !== false) enabledModels.push(model)
+        else otherModels.push(model)
+      }
+      const groups = [['enabledModels', enabledModels], ['otherModels', otherModels]]
+      const showLimits = savedLimits && limitCatalogCurrent
+      const selectedCount = list.filter(selected).length
       const button = (label, action, disabled = !writable, variant = 'ghost', size) => React.createElement(Button, { type: 'button', variant, size, disabled, onClick: action }, t(label))
       const note = (text, tone) => React.createElement('p', { className: 'cpa-note', 'data-tone': tone, role: 'status' }, text)
       const field = (label, control, hint) => React.createElement('label', { className: 'cpa-field' },
@@ -517,35 +534,38 @@ window.__ModuleLoader__.load({
             React.createElement('div', { className: 'cpa-toolbar' }, button('loadModels', preview, !writable, 'outline'), button('refresh', refresh, !writable || !state?.generation || !savedCatalogDraft)),
             field(t('search'), React.createElement(Input, { type: 'search', value: search, onChange: (event) => setSearch(event.currentTarget.value) })),
             React.createElement('div', { className: 'cpa-toolbar' },
-              React.createElement('span', { className: 'cpa-count' }, list.filter(selected).length, ' / ', list.length, ' ', t('selectedCount')),
+              React.createElement('span', { className: 'cpa-count' }, selectedCount, ' / ', list.length, ' ', t('selectedCount')),
               button('selectAll', () => setDraft((current) => ({ ...current, ...Object.fromEntries(list.map((model) => [model.id, true])) })), !writable, 'ghost', 'sm'),
               button('deselectAll', () => setDraft((current) => ({ ...current, ...Object.fromEntries(list.map((model) => [model.id, false])) })), !writable, 'ghost', 'sm'),
             ),
-            list.length && !list.filter(selected).length ? note(t('statusNoModels'), 'warn') : null,
-            list.length
-              ? React.createElement('div', { className: 'cpa-models' }, filtered.map((model) => React.createElement('div', { key: model.id, className: 'cpa-model' },
-                React.createElement('div', { className: 'cpa-model-head' },
-                  React.createElement(Checkbox, { label: t('enabled') + ' ' + (model.name || model.id), checked: selected(model), disabled: !writable, onChange: (checked) => setDraft((current) => ({ ...current, [model.id]: checked })) }),
-                  model.name && model.name !== model.id ? React.createElement('span', { className: 'cpa-model-id' }, model.id) : null,
-                ),
-                savedLimits && limitCatalogCurrent && React.createElement('fieldset', { className: 'cpa-limits' },
-                  React.createElement('legend', null, t('limits')),
-                  React.createElement('div', { className: 'cpa-limits-fields' },
-                    ...Object.entries(limitFields).map(([key, label]) => React.createElement('div', { key }, field(t(label), React.createElement(Input, {
-                      name: model.id + ':' + key, type: 'text', inputMode: 'numeric', disabled: !writable,
-                      placeholder: model.catalogSources?.[key] !== 'override' && model[key] != null ? String(model[key]) : undefined,
-                      value: (Object.hasOwn(limitDraft, model.id) ? limitDraft[model.id][key] : undefined) ?? String((savedCatalogDraft && Object.hasOwn(savedLimits, model.id) ? savedLimits[model.id][key] : undefined) ?? ''),
-                      onChange: (event) => {
-                        const value = event.currentTarget.value
-                        setLimitDraft((current) => ({ ...current, [model.id]: { ...(Object.hasOwn(current, model.id) ? current[model.id] : {}), [key]: value } }))
-                      },
-                    })))),
-                  ),
-                  React.createElement('p', { className: 'cpa-note' }, t('limitsHelp')),
-                ),
-                modelDetails(model, t),
-              )))
-              : React.createElement('p', { className: 'cpa-note' }, t('noModels')),
+            list.length && selectedCount === 0 ? note(t('statusNoModels'), 'warn') : null,
+            showLimits && (enabledModels.length || otherModels.length) ? React.createElement('p', { className: 'cpa-note cpa-catalog-hint' }, t('limitsHelp')) : null,
+            enabledModels.length || otherModels.length
+              ? React.createElement('div', { className: 'cpa-models' }, groups.flatMap(([label, group]) => group.length ? [
+                React.createElement('h4', { key: label, className: 'cpa-model-group' }, t(label)),
+                ...group.map((model) => React.createElement('div', { key: 'model:' + model.id, className: 'cpa-model' },
+                    React.createElement('div', { className: 'cpa-model-head' },
+                      React.createElement(Checkbox, { label: t('enabled') + ' ' + (model.name || model.id), checked: selected(model), disabled: !writable, onChange: (checked) => setDraft((current) => ({ ...current, [model.id]: checked })) }),
+                      model.name && model.name !== model.id ? React.createElement('span', { className: 'cpa-model-id' }, model.id) : null,
+                    ),
+                    showLimits && React.createElement('fieldset', { className: 'cpa-limits' },
+                      React.createElement('legend', null, t('limits')),
+                      React.createElement('div', { className: 'cpa-limits-fields' },
+                        ...Object.entries(limitFields).map(([key, label]) => React.createElement('div', { key }, field(t(label), React.createElement(Input, {
+                          name: model.id + ':' + key, type: 'text', inputMode: 'numeric', disabled: !writable,
+                          placeholder: model.catalogSources?.[key] !== 'override' && model[key] != null ? String(model[key]) : undefined,
+                          value: (Object.hasOwn(limitDraft, model.id) ? limitDraft[model.id][key] : undefined) ?? String((savedCatalogDraft && Object.hasOwn(savedLimits, model.id) ? savedLimits[model.id][key] : undefined) ?? ''),
+                          onChange: (event) => {
+                            const value = event.currentTarget.value
+                            setLimitDraft((current) => ({ ...current, [model.id]: { ...(Object.hasOwn(current, model.id) ? current[model.id] : {}), [key]: value } }))
+                          },
+                        })))),
+                      ),
+                    ),
+                    modelDetails(model, t),
+                )),
+              ] : []))
+              : React.createElement('p', { className: 'cpa-note', role: 'status' }, t(list.length ? 'noMatches' : 'noModels')),
           ),
           section(t('actions'),
             React.createElement('div', { className: 'cpa-actions' },
