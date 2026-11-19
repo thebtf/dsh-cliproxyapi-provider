@@ -15,7 +15,7 @@ https://raw.githubusercontent.com/thebtf/dsh-cliproxyapi-provider/main/market/in
 Requires Node.js 24.9.0 or newer. Built against DeepSeek Harness 0.2.2-rc.3; `engines.dsh` permits `>=0.2.2-rc.3 <1.0.0` to avoid unnecessary version gating, but future core API compatibility still requires testing. Install and update through npm:
 
 ```powershell
-npx @deepseek-ai/dsh plugin --profile web add '@thebtf/dsh-cliproxyapi-provider@0.5.4'
+npx @deepseek-ai/dsh plugin --profile web add '@thebtf/dsh-cliproxyapi-provider@0.5.5'
 npx @deepseek-ai/dsh web
 ```
 
