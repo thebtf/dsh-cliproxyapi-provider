@@ -127,6 +127,8 @@ test('limit editors are visible without opening model details', async () => {
   const editor = find(card, (node) => node.type === 'fieldset')[0]
   assert.deepEqual(find(editor, (node) => node.type === 'input').map((node) => node.props.name), ['one:contextWindow', 'one:maxTokens'])
   assert.match(text(disclosures[0]), /unknown field/)
+  assert.match(text(disclosures[0]), /reasoningEfforts|efforts/)
+  assert.ok(!card.children.some((node) => node?.props?.className === 'cpa-model-meta'))
 })
 
 test('model limits use editable per-model drafts, reject invalid input and reset independently', async () => {
