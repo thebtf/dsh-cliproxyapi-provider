@@ -117,6 +117,20 @@ test('every dictionary carries the same keys so no copy falls back to English', 
   for (const language of ['en', 'ru', 'zh']) for (const key of keys) assert.ok(String(dict[language][key]).trim(), `${language}:${key}`)
 })
 
+test('limit editors are visible without opening model details', async () => {
+  const h = await harness({ ...state(), modelLimits: {} })
+  const card = find(h.render(), (node) => node.props.className === 'cpa-model')[0]
+  const disclosures = find(card, (node) => node.type === 'details')
+  assert.ok(disclosures.length)
+  assert.ok(disclosures.every((node) => !node.props.open))
+  assert.equal(disclosures.flatMap((node) => find(node, (child) => child.type === 'input')).length, 0)
+  const editor = find(card, (node) => node.type === 'fieldset')[0]
+  assert.deepEqual(find(editor, (node) => node.type === 'input').map((node) => node.props.name), ['one:contextWindow', 'one:maxTokens'])
+  assert.match(text(disclosures[0]), /unknown field/)
+  assert.match(text(disclosures[0]), /reasoningEfforts|efforts/)
+  assert.ok(!card.children.some((node) => node?.props?.className === 'cpa-model-meta'))
+})
+
 test('model limits use editable per-model drafts, reject invalid input and reset independently', async () => {
   const h = await harness({ ...state(), modelLimits: { one: { maxTokens: 500 } } })
   const limit = (name) => find(h.render(), (node) => node.type === 'input' && node.props.name === name)[0]
