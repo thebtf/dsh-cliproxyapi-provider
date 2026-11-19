@@ -159,6 +159,11 @@ window.__ModuleLoader__.load({
 .cpa-trace { margin-top:8px; }
 .cpa-trace-log { max-height:180px; overflow-y:auto; scrollbar-gutter:stable; }
 .cpa-model-meta { display:flex; flex-wrap:wrap; align-items:center; gap:6px; min-width:0; }
+.cpa-limits { min-width:0; margin:4px 0 2px; padding:0; border:0; }
+.cpa-limits > legend { padding:0; margin-bottom:4px; font-weight:600; color:var(--dsw-alias-label-primary); }
+.cpa-limits-fields { display:flex; flex-wrap:wrap; gap:8px 12px; }
+.cpa-limits-fields > div { flex:1 1 10rem; min-width:0; max-width:16rem; }
+.cpa-limits > .cpa-note { margin-top:4px; }
 .cpa-details { min-width:0; font-size:12px; line-height:1.6; }
 .cpa-details > summary { cursor:pointer; color:var(--dsw-alias-label-tertiary); }
 .cpa-details > summary:hover { color:var(--dsw-alias-label-secondary); }
@@ -258,7 +263,7 @@ window.__ModuleLoader__.load({
 
     const limitFields = { contextWindow: 'context', maxTokens: 'output' }
 
-    function modelDetails(model, t, limitsEditor) {
+    function modelDetails(model, t) {
       const raw = model.catalogMetadata && typeof model.catalogMetadata === 'object' ? model.catalogMetadata : {}
       const source = (key) => model.catalogSources?.[key] === 'default' ? t('sourceDefault') : model.catalogSources?.[key] === 'cpa' ? t('sourceCPA') : model.catalogSources?.[key] === 'override' ? t('sourceOverride') : ''
       const line = (label, value, provenance) => value === undefined || value === null ? null : React.createElement('p', null, label, ': ', String(value), provenance ? ' (' + provenance + ')' : '')
@@ -268,7 +273,6 @@ window.__ModuleLoader__.load({
           line(t('context'), model.contextWindow?.toLocaleString(), source('contextWindow')),
           line(t('output'), model.maxTokens?.toLocaleString(), source('maxTokens')),
           line(t('modalities'), (model.inputModalities || model.input || []).join(', '), source('inputModalities')),
-          limitsEditor,
           raw.description != null ? React.createElement('p', null, t('description'), ': ', metadataValue(raw.description, t)) : null,
           raw.default_reasoning_level != null ? React.createElement('p', null, t('defaultEffort'), ': ', metadataValue(raw.default_reasoning_level, t)) : null,
           Array.isArray(raw.supported_reasoning_levels) ? React.createElement('div', null,
@@ -524,9 +528,9 @@ window.__ModuleLoader__.load({
                   model.name && model.name !== model.id ? React.createElement('span', { className: 'cpa-model-id' }, model.id) : null,
                 ),
                 modelEfforts(model, t),
-                modelDetails(model, t, savedLimits && limitCatalogCurrent && React.createElement('details', { className: 'cpa-details' },
-                  React.createElement('summary', null, t('limits')),
-                  React.createElement('div', { className: 'cpa-details-body' },
+                savedLimits && limitCatalogCurrent && React.createElement('fieldset', { className: 'cpa-limits' },
+                  React.createElement('legend', null, t('limits')),
+                  React.createElement('div', { className: 'cpa-limits-fields' },
                     ...Object.entries(limitFields).map(([key, label]) => React.createElement('div', { key }, field(t(label), React.createElement(Input, {
                       name: model.id + ':' + key, type: 'text', inputMode: 'numeric', disabled: !writable,
                       placeholder: model.catalogSources?.[key] !== 'override' && model[key] != null ? String(model[key]) : undefined,
@@ -536,9 +540,10 @@ window.__ModuleLoader__.load({
                         setLimitDraft((current) => ({ ...current, [model.id]: { ...(Object.hasOwn(current, model.id) ? current[model.id] : {}), [key]: value } }))
                       },
                     })))),
-                    note(t('limitsHelp')),
                   ),
-                )),
+                  React.createElement('p', { className: 'cpa-note' }, t('limitsHelp')),
+                ),
+                modelDetails(model, t),
               )))
               : React.createElement('p', { className: 'cpa-note' }, t('noModels')),
           ),
