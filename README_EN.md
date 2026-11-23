@@ -12,10 +12,10 @@ The plugin is listed in its own DSH plugin market index. Add the index once, the
 https://raw.githubusercontent.com/thebtf/dsh-cliproxyapi-provider/main/market/index.json
 ```
 
-Requires Node.js 24.9.0 or newer. Built against DeepSeek Harness 0.2.2-rc.3; `engines.dsh` permits `>=0.2.2-rc.3 <1.0.0` to avoid unnecessary version gating, but future core API compatibility still requires testing. Install and update through npm:
+Requires Node.js 24.9.0 or newer for the plugin; the DSH host may require a newer Node.js. The compatibility matrix checks core 0.2.2-rc.3, 0.2.2-rc.5 (the Desktop NEXT core), and 0.2.3-alpha.2 (the Desktop Beta core). These checks cover the core APIs, not the entire Desktop application. Install and update through npm:
 
 ```powershell
-npx @deepseek-ai/dsh plugin --profile web add '@thebtf/dsh-cliproxyapi-provider@0.5.5'
+npx @deepseek-ai/dsh plugin --profile web add '@thebtf/dsh-cliproxyapi-provider@0.5.6'
 npx @deepseek-ai/dsh web
 ```
 

@@ -1,0 +1,27 @@
+name: Core compatibility
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  core:
+    name: DSH ${{ matrix.core }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        core: [0.2.2-rc.3, 0.2.2-rc.5, 0.2.3-alpha.2]
+    env:
+      CORE_VERSION: ${{ matrix.core }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.3'
+      - run: node scripts/check-core-compat.mjs "$CORE_VERSION"

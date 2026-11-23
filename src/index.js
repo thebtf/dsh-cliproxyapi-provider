@@ -1,7 +1,7 @@
 import { AsyncResource } from 'node:async_hooks'
 import z from '@deepseek-ai/schemastery'
-import { credentialRef } from '@deepseek-ai/dsh-credentials'
-import { assertUsableApiKey, attributionHeaders } from '@deepseek-ai/dsh-llm'
+import * as credentialsApi from '@deepseek-ai/dsh-credentials'
+import * as llmApi from '@deepseek-ai/dsh-llm'
 import { Config as PiAiConfig } from '@deepseek-ai/dsh-llm-pi-ai'
 import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
 import { catalogOptions, catalogURL, readCodexCatalogWithMetadata } from './catalog.js'
@@ -9,6 +9,11 @@ import { installGateway } from './gateway.js'
 import { protocolOf } from './policy.js'
 import { ConnectionError, resolveIdentity, validateEndpoint } from './connection.js'
 import { canonicalEndpoint } from './endpoint.js'
+
+const { credentialRef } = credentialsApi
+const { attributionHeaders, INVALID_CREDENTIAL_CODE, LlmError } = llmApi
+// DSH 0.2.3 moved normalization from llm to credentials.
+const normalizeApiKey = credentialsApi.normalizeApiKey ?? llmApi.normalizeApiKey
 
 const MAX_CATALOG_BYTES = 4 * 1024 * 1024
 const DISCOVERY_HANDOFF_TTL_MS = 60_000
@@ -127,7 +132,10 @@ async function optionalApiKey(ctx, supplied) {
     ? (await ctx.credentials.resolve(API_KEY_REF))?.value
     : supplied
   if (raw === undefined || raw.length === 0) return undefined
-  return assertUsableApiKey(raw, DISCOVERY_NS, API_KEY_REF)
+  const checked = normalizeApiKey(raw)
+  if (checked.ok) return checked.value
+  const defect = checked.reason === 'empty' ? 'is blank' : 'contains characters no HTTP header can carry'
+  throw new LlmError(`${DISCOVERY_NS}: the API key resolved from ${API_KEY_REF} ${defect}; set it to the raw key alone`, INVALID_CREDENTIAL_CODE)
 }
 
 function timedSignal(parent, timeoutMs) {

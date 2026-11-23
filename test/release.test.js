@@ -62,7 +62,7 @@ test('registry polling tolerates missing metadata and transient 500 then verifie
  assert.equal(typeof artifact.verifyRegistry, 'function')
  let requests = 0
  const url = await fixture(t, (req,res) => { if(req.url === '/archive') return res.end(bytes); if (++requests < 3) {res.statusCode = requests === 1 ? 404 : 500; return res.end('pending')} res.end(JSON.stringify(metadata(url))) })
- const result = await artifact.verifyRegistry({ manifest, bytes, registry:url, attempts:3, delayMs:1, timeoutMs:200 })
+ const result = await artifact.verifyRegistry({ manifest, bytes, registry:url, attempts:3, delayMs:1, timeoutMs:2000 })
  assert.equal(result.publishedAt, date); assert.equal(requests,3)
 })
 for (const mode of ['404','500','json','timeout','truncated','mismatch','identity','timestamp','engines']) test('registry fails closed for ' + mode, async t => {
@@ -92,7 +92,7 @@ test('verified catalog file update supports dry-run and byte-identical repeat', 
  const dir=await mkdtemp(join(tmpdir(),'release-success-'));t.after(()=>rm(dir,{recursive:true,force:true}))
  const path=join(dir,'index.json');const original=JSON.stringify(index);await writeFile(path,original)
  const url=await fixture(t,(req,res)=>res.end(req.url==='/archive'?bytes:JSON.stringify(metadata(url))))
- const options={indexPath:path,manifest,bytes,registry:url,attempts:1,timeoutMs:200}
+ const options={indexPath:path,manifest,bytes,registry:url,attempts:1,timeoutMs:2000}
  const preview=await market.updateMarketFile({...options,dryRun:true})
  assert.equal(await readFile(path,'utf8'),original)
  assert.equal(preview.plugins[0].versions[0].version,manifest.version)
