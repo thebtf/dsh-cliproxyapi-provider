@@ -295,6 +295,23 @@ test('catalog RPC and POST bind saved keys to their endpoint without fallback', 
     assert.equal(calls.length, 6)
   } finally { harness.dispose(); globalThis.fetch = previousFetch }
 })
+test('catalog discovery normalizes usable keys and rejects unusable keys without echoing them', async () => {
+  const previousFetch = globalThis.fetch
+  const calls = []
+  globalThis.fetch = async (_url, init) => { calls.push(new Headers(init.headers).get('authorization')); return Response.json({ models: [{ slug: 'model' }] }) }
+  const harness = createContext({ providers: {} })
+  try {
+    apply(harness.ctx, await resolvedConfig())
+    const rpc = harness.discoveries.get('llm-cliproxyapi')
+    const baseURL = 'https://fixture.invalid/v1'
+    await rpc({ baseURL, apiKey: '  fixture-key  ' })
+    for (const apiKey of ['   ', 'must-not-echo\nsecret', 'must-not-echo-🔑']) {
+      await assert.rejects(rpc({ baseURL, apiKey }), (error) => error.code === 'INVALID_CREDENTIAL' && !error.message.includes('must-not-echo'))
+    }
+    assert.deepEqual(calls, ['Bearer fixture-key'])
+  } finally { harness.dispose(); globalThis.fetch = previousFetch }
+})
+
 test('legacy discovery reuses its key only at its known endpoint', async () => {
   const previousFetch = globalThis.fetch
   const calls = []

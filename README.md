@@ -12,10 +12,10 @@
 https://raw.githubusercontent.com/thebtf/dsh-cliproxyapi-provider/main/market/index.json
 ```
 
-需要 Node.js 24.9.0 或更新版本。基于 DeepSeek Harness 0.2.2-rc.3 构建；`engines.dsh` 允许 `>=0.2.2-rc.3 <1.0.0` 以避免不必要的版本限制，但未来核心 API 的兼容性仍需测试。通过 npm 安装与更新：
+插件需要 Node.js 24.9.0 或更新版本；DSH 宿主可能要求更高版本。兼容性矩阵验证核心 0.2.2-rc.3、0.2.2-rc.5（Desktop NEXT）与 0.2.3-alpha.2（Desktop Beta）。测试覆盖核心 API，而非整个桌面应用。通过 npm 安装与更新：
 
 ```powershell
-npx @deepseek-ai/dsh plugin --profile web add '@thebtf/dsh-cliproxyapi-provider@0.5.5'
+npx @deepseek-ai/dsh plugin --profile web add '@thebtf/dsh-cliproxyapi-provider@0.5.6'
 npx @deepseek-ai/dsh web
 ```
 

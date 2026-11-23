@@ -1,5 +1,9 @@
 # Releasing
 
+## Core compatibility before release
+
+Run the [core compatibility workflow](.github/workflows/compatibility.yml) on the exact PR commit. It tests the published core dependencies for the oldest supported official build, the current Desktop NEXT core, and the upcoming Desktop Beta core with their matching Cordis versions. Locally, run `node scripts/check-core-compat.mjs` on Node 24.22.3 or newer. Test any newly advertised line before widening the manifest and the Discover listing. Core API tests do not replace a packaged Desktop smoke test.
+
 Releases are cut from `main`: bump `package.json`, commit, open a PR, merge it,
 then tag the merge commit and publish a GitHub Release. Publishing to npm is
 wired to that Release and authenticates with **npm trusted publishing (OIDC)** —
@@ -209,7 +213,7 @@ entry under `plugins[0].versions`:
   "version": "0.4.4",
   "publishTimestamp": 1763081476,
   "source": { "type": "npm" },
-  "engines": { "dsh": ">=0.2.2-rc.3 <1.0.0" }
+  "engines": { "dsh": ">=0.2.2-rc.3 <0.2.3-0 || >=0.2.3-alpha.2 <0.2.4-0" }
 }
 ```
 
