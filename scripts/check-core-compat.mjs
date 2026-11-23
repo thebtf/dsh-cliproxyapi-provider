@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { cpSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -14,7 +14,7 @@ const matrix = new Map([
 const corePrefix = '@deepseek-ai/dsh-'
 const cordisPackage = '@deepseek-ai/cordis'
 const schemaPackage = '@deepseek-ai/schemastery'
-const projectFiles = ['.github/workflows', 'client.js', 'cordis.patch.yml', 'details', 'locale', 'market', 'scripts', 'src', 'test']
+const projectFiles = ['.github/workflows', 'README.md', 'README_EN.md', 'client.js', 'cordis.patch.yml', 'details', 'locale', 'market', 'scripts', 'src', 'test']
 const packageTest = 'test/package.test.js'
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'))
 
@@ -24,21 +24,36 @@ function run(command, args, cwd, env = process.env) {
   assert.equal(status, 0, `${command} ${args.join(' ')} failed (${signal ?? `exit ${status}`})`)
 }
 
-function install(cwd) {
+function npm(cwd, args) {
   // Do not inherit an alternate registry or npm settings that relax peer resolution.
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^npm_config_/i.test(key)))
-  const args = [
-    'install', '--registry=https://registry.npmjs.org/',
-    '--userconfig', join(cwd, '.compat-user-npmrc'),
-    '--globalconfig', join(cwd, '.compat-global-npmrc'),
-    '--include=dev', '--ignore-scripts', '--strict-peer-deps', '--engine-strict', '--no-audit', '--no-fund',
-  ]
+  args = [...args, '--registry=https://registry.npmjs.org/', '--ignore-scripts',
+    '--userconfig', join(cwd, '.compat-user-npmrc'), '--globalconfig', join(cwd, '.compat-global-npmrc')]
   if (process.platform === 'win32') {
     const cli = process.env.npm_execpath ?? join(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js')
     run(process.execPath, [cli, ...args], cwd, env)
   } else {
     run('npm', args, cwd, env)
   }
+}
+
+function install(cwd) {
+  npm(cwd, ['install', '--include=dev', '--strict-peer-deps', '--engine-strict', '--no-audit', '--no-fund'])
+}
+
+function testPackedConsumer(cwd, manifest) {
+  const consumer = mkdtempSync(join(cwd, 'consumer-'))
+  npm(cwd, ['pack', '--pack-destination', consumer])
+  const tarballs = readdirSync(consumer).filter((name) => name.endsWith('.tgz'))
+  assert.equal(tarballs.length, 1)
+  const dependencies = Object.fromEntries(Object.entries({ ...manifest.dependencies, ...manifest.peerDependencies })
+    .filter(([name]) => name.startsWith(corePrefix) || name === cordisPackage || name === schemaPackage))
+  dependencies[manifest.name] = 'file:./' + tarballs[0]
+  writeFileSync(join(consumer, 'package.json'), JSON.stringify({ name: 'compat-consumer', private: true, dependencies }))
+  install(consumer)
+  run(process.execPath, ['--input-type=module', '-e',
+    'const { apply } = await import(process.argv[1]); if (typeof apply !== "function") process.exit(1)', manifest.name], consumer)
+  console.log('Verified unchanged packed manifest and consumer entrypoint')
 }
 
 function testCore(version) {
@@ -87,6 +102,7 @@ function testCore(version) {
       writeFileSync(manifestPath, originalManifest)
       run(process.execPath, ['--test', packageTest], cwd)
     }
+    testPackedConsumer(cwd, manifest)
   } finally {
     rmSync(cwd, { recursive: true, force: true, maxRetries: 3 })
   }

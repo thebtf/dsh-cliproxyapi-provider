@@ -210,8 +210,8 @@ entry under `plugins[0].versions`:
 
 ```json
 {
-  "version": "0.4.4",
-  "publishTimestamp": 1763081476,
+  "version": "<package version>",
+  "publishTimestamp": 0,
   "source": { "type": "npm" },
   "engines": { "dsh": ">=0.2.2-rc.3 <0.2.3-0 || >=0.2.3-alpha.2 <0.2.4-0" }
 }
